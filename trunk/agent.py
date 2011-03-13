@@ -367,7 +367,8 @@ class TraderSpiDelegate(TraderSpi):
         print pRspInfo,nRequestID
         self.logger.warning(u'CTP报单录入错误回报, 正常后不应该出现,rspInfo=%s'%(str(pRspInfo),))
         #self.logger.warning(u'报单校验错误,ErrorID=%s,ErrorMsg=%s,pRspInfo=%s,bIsLast=%s' % (pRspInfo.ErrorID,pRspInfo.ErrorMsg,str(pRspInfo),bIsLast))
-        self.agent.rsp_order_insert(pInputOrder.OrderRef,pInputOrder.InstrumentID,pRspInfo.ErrorID,pRspInfo.ErrorMsg)
+        #self.agent.rsp_order_insert(pInputOrder.OrderRef,pInputOrder.InstrumentID,pRspInfo.ErrorID,pRspInfo.ErrorMsg)
+        self.agent.err_order_insert(pInputOrder.OrderRef,pInputOrder.InstrumentID,pRspInfo.ErrorID,pRspInfo.ErrorMsg)
     
     def OnErrRtnOrderInsert(self, pInputOrder, pRspInfo):
         '''
@@ -382,6 +383,7 @@ class TraderSpiDelegate(TraderSpi):
     def OnRtnOrder(self, pOrder):
         ''' 报单通知
             CTP、交易所接受报单
+            Agent中不区分，所得信息只用于撤单
         '''
         self.logger.info(u'报单响应,Order=%s' % str(pOrder))
         if pOrder.OrderStatus == 'a':
@@ -392,19 +394,22 @@ class TraderSpiDelegate(TraderSpi):
         else:
             #print u'交易所接受Order,exchangeID=%s,OrderSysID=%s,TraderID=%s, OrderLocalID=%s' % (pOrder.ExchangeID,pOrder.OrderSysID,pOrder.TraderID,pOrder.OrderLocalID)
             self.logger.info(u'交易所接受Order,exchangeID=%s,OrderSysID=%s,TraderID=%s, OrderLocalID=%s' % (pOrder.ExchangeID,pOrder.OrderSysID,pOrder.TraderID,pOrder.OrderLocalID))
-            self.agent.rtn_order_exchange(pOrder)
+            #self.agent.rtn_order_exchange(pOrder)
+            self.agent.rtn_order_ctp(pOrder)
 
     def OnRtnTrade(self, pTrade):
         '''成交通知'''
         print u'成交通知,BrokerID=%s,BrokerOrderSeq = %s,exchangeID=%s,OrderSysID=%s,TraderID=%s, OrderLocalID=%s' %(pTrade.BrokerID,pTrade.BrokerOrderSeq,pTrade.ExchangeID,pTrade.OrderSysID,pTrade.TraderID,pTrade.OrderLocalID)
         self.logger.info(u'成交回报,Trade=%s' % repr(pTrade))
+        self.agent.rtn_trade(pTrade)
 
     def OnRspOrderAction(self, pInputOrderAction, pRspInfo, nRequestID, bIsLast):
         '''
             ctp撤单校验错误
         '''
         self.logger.warning(u'CTP撤单录入错误回报, 正常后不应该出现,rspInfo=%s'%(str(pRspInfo),))
-        self.agent.rsp_order_action(pInputOrderAction.OrderRef,pInputOrderAction.InstrumentID,pRspInfo.ErrorID,pRspInfo.ErrorMsg)
+        #self.agent.rsp_order_action(pInputOrderAction.OrderRef,pInputOrderAction.InstrumentID,pRspInfo.ErrorID,pRspInfo.ErrorMsg)
+        self.agent.err_order_action(pInputOrderAction.OrderRef,pInputOrderAction.InstrumentID,pRspInfo.ErrorID,pRspInfo.ErrorMsg)
 
     def OnErrRtnOrderAction(self, pOrderAction, pRspInfo):
         ''' 
@@ -779,26 +784,13 @@ class Agent(object):
     ###回应
     def rtn_order_ctp(self,sorder):
         '''
-            ctp接受下单/撤单回报
-        '''
-        pass    #可以忽略
-
-    def rtn_order_exchange(self,sorder):
-        '''
-            交易所接受下单/撤单回报
-        '''
-        #需要记录
-        pass
-
-    def rsp_order_insert(self,order_ref,instrument_id,error_id,error_msg):
-        '''
-            CTP下单错误回报
+            ctp/交易所接受下单/撤单回报,不区分ctp和交易所
         '''
         pass    #可以忽略
 
     def err_order_insert(self,order_ref,instrument_id,error_id,error_msg):
         '''
-            交易所下单错误回报
+            ctp/交易所下单错误回报，不区分ctp和交易所
         '''
         pass    #可以忽略
 
@@ -808,26 +800,30 @@ class Agent(object):
         '''
         pass    #需要记录
 
-    def rsp_order_action(self,order_ref,instrument_id,error_id,error_msg):
-        '''
-            CTP撤单错误回报
-        '''
-        pass    #可以忽略
-    
     def err_order_action(self,order_ref,instrument_id,error_id,error_msg):
         '''
-            交易所撤单错误回报
+            ctp/交易所撤单错误回报，不区分ctp和交易所
         '''
         pass    #可能撤单已经成交
     
+    ###辅助   
+    def rsp_qry_position(self,position):
+        '''
+            查询持仓回报, 得到持仓的一多一空
+        '''
+        pass
     
     def rsp_qry_instrument_marginrate(self):
         '''
             查询保证金率回报
+            暂时忽略
         '''
         pass
 
     def rsp_qry_instrument(self):
+        '''
+            暂时忽略
+        '''
         pass
 
     def rsp_qry_trading_account(self,account):
@@ -836,30 +832,27 @@ class Agent(object):
         '''
         pass
 
-    def rsp_qry_position(self,position):
-        '''
-            查询持仓回报, 得到持仓的一多一空
-        '''
-        pass
-
     def rsp_qry_position_detail(self,position_detail):
         '''
             查询持仓明细回报, 得到每一次成交的持仓,其中若已经平仓,则持量为0,平仓量>=1
+            可以忽略
         '''
         pass
-
 
     def rsp_qry_order(self,sorder):
         '''
             查询报单
+            可以忽略
         '''
-        pass    #可以忽略
+        pass    
 
     def rsp_qry_trade(self,strade):
         '''
             查询成交
+            可以忽略
         '''
-        pass    #可以忽略
+        pass    
+
 
 import config as c 
 
