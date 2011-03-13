@@ -47,8 +47,8 @@ THOST_TERT_QUICK    = 2
 
 NFUNC = lambda data:None    #空函数桩
 
-#INSTS = [u'IF1103',u'IF1104']  #必须采用ctp使用的合约名字，内部不做检验
-INSTS = [u'IF1103']  #必须采用ctp使用的合约名字，内部不做检验
+INSTS = [u'IF1103',u'IF1104']  #必须采用ctp使用的合约名字，内部不做检验
+#INSTS = [u'IF1103']  #必须采用ctp使用的合约名字，内部不做检验
 #建议每跟踪的一个合约都使用一个行情-交易对. 因为行情的接收是阻塞式的,在做处理的时候会延误后面接收的行情
 #套利时每一对合约都用一个行情-交易对
 #INSTS = [u'IF1102']
@@ -267,6 +267,10 @@ class TraderSpiDelegate(TraderSpi):
             print u'结算单内容:%s' % pSettlementInfo.Content
             self.logger.info(u'结算单内容:%s' % pSettlementInfo.Content)
             self.confirm_settlement_info()
+        else:
+            time.sleep(1)
+            self.agent.initialize()
+            
 
     def OnRspQrySettlementInfoConfirm(self, pSettlementInfoConfirm, pRspInfo, nRequestID, bIsLast):
         '''请求查询结算信息确认响应'''
@@ -283,12 +287,17 @@ class TraderSpiDelegate(TraderSpi):
                 self.query_settlement_info()
             else:
                 self.logger.info(u'最新结算单已确认，不需再次确认,最后确认时间=%s,scur_day:%s' % (pSettlementInfoConfirm.ConfirmDate,self.scur_day))
+                time.sleep(1)
+                self.agent.initialize()
+
 
     def OnRspSettlementInfoConfirm(self, pSettlementInfoConfirm, pRspInfo, nRequestID, bIsLast):
         '''投资者结算结果确认响应'''
         if(self.resp_common(pRspInfo,bIsLast,u'结算单确认')>0):
             self.logger.info(u'结算单确认时间: %s-%s' %(pSettlementInfoConfirm.ConfirmDate,pSettlementInfoConfirm.ConfirmTime))
-        #self.agent.initialize()
+        time.sleep(1)
+        self.agent.initialize()
+
 
     ###交易准备
     def OnRspQryInstrument(self, pInstrument, pRspInfo, nRequestID, bIsLast):
@@ -300,7 +309,7 @@ class TraderSpiDelegate(TraderSpi):
             保证金率回报。返回的必然是绝对值
         '''
         if bIsLast and self.isRspSuccess(pRspInfo):
-            agent.rsp_qry_instrument_marginrate(pInstrumentMarginRate)
+            self.agent.rsp_qry_instrument_marginrate(pInstrumentMarginRate)
         else:
             #logging
             pass
@@ -390,12 +399,12 @@ class TraderSpiDelegate(TraderSpi):
             #CTP接受，但未发到交易所
             #print u'CTP接受Order，但未发到交易所, BrokerID=%s,BrokerOrderSeq = %s,TraderID=%s, OrderLocalID=%s' % (pOrder.BrokerID,pOrder.BrokerOrderSeq,pOrder.TraderID,pOrder.OrderLocalID)
             self.logger.info(u'CTP接受Order，但未发到交易所, BrokerID=%s,BrokerOrderSeq = %s,TraderID=%s, OrderLocalID=%s' % (pOrder.BrokerID,pOrder.BrokerOrderSeq,pOrder.TraderID,pOrder.OrderLocalID))
-            self.agent.rtn_order_ctp(pOrder)
+            self.agent.rtn_order(pOrder)
         else:
             #print u'交易所接受Order,exchangeID=%s,OrderSysID=%s,TraderID=%s, OrderLocalID=%s' % (pOrder.ExchangeID,pOrder.OrderSysID,pOrder.TraderID,pOrder.OrderLocalID)
             self.logger.info(u'交易所接受Order,exchangeID=%s,OrderSysID=%s,TraderID=%s, OrderLocalID=%s' % (pOrder.ExchangeID,pOrder.OrderSysID,pOrder.TraderID,pOrder.OrderLocalID))
             #self.agent.rtn_order_exchange(pOrder)
-            self.agent.rtn_order_ctp(pOrder)
+            self.agent.rtn_order(pOrder)
 
     def OnRtnTrade(self, pTrade):
         '''成交通知'''
@@ -452,9 +461,10 @@ class Agent(object):
         self.trading_day = 20110101
         self.scur_day = int(time.strftime('%Y%m%d'))
         #当前资金/持仓
-        self.account = 0
+        self.available = 0  #可用资金
         self.position = []
-
+        #保证金率
+        self.marginrate = {}
 
         self.register_data_funcs(
                 BaseObject(sfunc=NFUNC,func1=hreader.time_period_switch),    #时间切换函数
@@ -464,6 +474,9 @@ class Agent(object):
             )
 
         self.prepare_data_env()
+
+        ##命令队列
+        self.commands = []
 
     def set_spi(self,spi):
         self.spi = spi
@@ -491,7 +504,21 @@ class Agent(object):
         '''
             初始化，如保证金率，账户资金等
         '''
-        pass
+        ##必须先把持仓初始化成配置值或者0
+        self.commands.append(self.fetch_trading_account)
+        for inst in self.instruments:
+            
+            self.commands.append(fcustom(self.fetch_instrument_marginrate,instrument_id = inst))
+            self.commands.append(fcustom(self.fetch_investor_position,instrument_id = inst))
+            
+        self.check_qry_commands()
+
+    def check_qry_commands(self):
+        #必然是在rsp中要发出另一个查询
+        if len(self.commands)>0:
+            time.sleep(1)
+            self.commands[0]()
+            del self.commands[0]
 
     def prepare_data_env(self):
         '''
@@ -502,7 +529,6 @@ class Agent(object):
             for dfo in self.data_funcs:
                 dfo.sfunc(dinst)
             
-
     def register_strategy(self,strategys):
         '''
             策略注册. 简单版本，都按照100%用完合约分额计算. 这样，合约的某个策略集合持仓时，其它策略集合就不能再开仓
@@ -551,11 +577,22 @@ class Agent(object):
         print u'查询持仓, 函数发出返回值:%s' % r
     
     def fetch_investor_position_detail(self,instrument_id):
-        #获取合约的当前持仓明细
+        '''
+            获取合约的当前持仓明细，目前没用
+        '''
         print u'获取合约%s的当前持仓..' % (instrument_id,)
         req = ustruct.QryInvestorPositionDetail(BrokerID=self.cuser.broker_id, InvestorID=self.cuser.investor_id,InstrumentID=instrument_id)
         r=self.trader.ReqQryInvestorPositionDetail(req,self.inc_request_id())
         print u'查询持仓, 函数发出返回值:%s' % r
+
+    def fetch_instrument_marginrate(self,instrument_id):
+        req = ustruct.QryInstrumentMarginRate(BrokerID=self.cuser.broker_id,
+                        InvestorID=self.cuser.investor_id,
+                        InstrumentID=instrument_id,
+                        HedgeFlag = utype.THOST_FTDC_HF_Speculation
+                )
+        r = self.trader.ReqQryInstrumentMarginRate(req,self.inc_request_id())
+        print u'查询保证金率, 函数发出返回值:%s' % r
 
     ##交易处理
     def RtnTick(self,ctick):#行情处理主循环
@@ -711,7 +748,7 @@ class Agent(object):
                 CombHedgeFlag = utype.THOST_FTDC_HF_Speculation,   #投机 5位字符,但是只用到第0位
 
                 VolumeCondition = utype.THOST_FTDC_VC_AV,
-                MinVolume = 1,
+                MinVolume = 1,  #这个作用有点不确定,有的文档设成0了
                 ForceCloseReason = utype.THOST_FTDC_FCC_NotForceClose,
                 IsAutoSuspend = 1,
                 UserForceClose = 0,
@@ -738,7 +775,7 @@ class Agent(object):
                 CombHedgeFlag = utype.THOST_FTDC_HF_Speculation,   #投机 5位字符,但是只用到第0位
 
                 VolumeCondition = utype.THOST_FTDC_VC_AV,
-                MinVolume = 1,
+                MinVolume = 1,  #这个有点不确定
                 ForceCloseReason = utype.THOST_FTDC_FCC_NotForceClose,
                 IsAutoSuspend = 1,
                 UserForceClose = 0,
@@ -782,15 +819,17 @@ class Agent(object):
     ###交易
 
     ###回应
-    def rtn_order_ctp(self,sorder):
+    def rtn_order(self,sorder):
         '''
             ctp/交易所接受下单/撤单回报,不区分ctp和交易所
+            暂时忽略
         '''
-        pass    #可以忽略
+        pass
 
     def err_order_insert(self,order_ref,instrument_id,error_id,error_msg):
         '''
             ctp/交易所下单错误回报，不区分ctp和交易所
+            正常情况下不应当出现
         '''
         pass    #可以忽略
 
@@ -803,6 +842,7 @@ class Agent(object):
     def err_order_action(self,order_ref,instrument_id,error_id,error_msg):
         '''
             ctp/交易所撤单错误回报，不区分ctp和交易所
+            不处理，可记录
         '''
         pass    #可能撤单已经成交
     
@@ -811,47 +851,50 @@ class Agent(object):
         '''
             查询持仓回报, 得到持仓的一多一空
         '''
-        pass
-    
-    def rsp_qry_instrument_marginrate(self):
+        print u'agent 持仓:',str(position)
+        self.check_qry_commands() 
+
+    def rsp_qry_instrument_marginrate(self,marginRate):
         '''
             查询保证金率回报
-            暂时忽略
         '''
-        pass
+        self.marginrate[marginRate.InstrumentID] = (marginRate.LongMarginRatioByMoney,marginRate.ShortMarginRatioByMoney)
+        print str(marginRate)
+        self.check_qry_commands()
 
     def rsp_qry_instrument(self):
         '''
             暂时忽略
         '''
-        pass
+        self.check_qry_commands()
 
     def rsp_qry_trading_account(self,account):
         '''
             查询资金帐户回报
         '''
-        pass
+        self.available = account.Available
+        self.check_qry_commands()        
 
     def rsp_qry_position_detail(self,position_detail):
         '''
             查询持仓明细回报, 得到每一次成交的持仓,其中若已经平仓,则持量为0,平仓量>=1
             可以忽略
         '''
-        pass
+        self.check_qry_commands()
 
     def rsp_qry_order(self,sorder):
         '''
             查询报单
             可以忽略
         '''
-        pass    
+        self.check_qry_commands()
 
     def rsp_qry_trade(self,strade):
         '''
             查询成交
             可以忽略
         '''
-        pass    
+        self.check_qry_commands()
 
 
 import config as c 
@@ -940,7 +983,9 @@ myagent.spi.OnErrRtnOrderAction(agent.BaseObject(OrderRef='12',InstrumentID='IF1
 #资金和持仓
 myagent.fetch_trading_account()
 myagent.fetch_investor_position(u'IF1103')
-myagent.fetch_investor_position_detail(u'IF1103')
+#myagent.fetch_investor_position_detail(u'IF1103')
+myagent.fetch_instrument_marginrate(u'IF1103')
+
 
 #测试报单
 morder = agent.BaseObject(instrument='IF1103',direction='0',order_ref=myagent.inc_order_ref(),price=3280,volume=1)

@@ -16,6 +16,7 @@ TODO:   为真实起见，在mock中采用Command模式
     ...   
 '''
 
+import time
 import hreader
 import agent
 
@@ -24,13 +25,31 @@ class TraderMock(object):
         '''记录agent以回调agent的成交回报接口'''
         self.myagent = myagent
 
-    def ReqOrderInsert(self, pInputOrder, nRequestID):
+    def ReqOrderInsert(self, order, request_id):
         '''报单录入请求, 需要调用成交函数'''
-        pass
+        oid = order.OrderRef
+        trade = ustruct.Trade(
+                    InstrumentID = order.InstrumentID,
+                    Direction=order.Direction,
+                    Price = order.LimitPrice,
+                    Volume = order.Volume,
+                    OrderRef = oid,
+                    TradeID=oid,
+                    OrderSysID=oid,
+                    BrokerOrderSeq=oid,
+                    OrderLocalID = oid,
+                    TradeTime = time.strftime('%H%M%S'),#只有备案作用
+                )
+        self.myagent.rtn_trade(trade)
 
-    def ReqOrderAction(self, pInputOrderAction, nRequestID):
+    def ReqOrderAction(self, corder, request_id):
         '''撤单请求'''
-        return _ctp_Trader.ReqOrderAction(self.api_ptr, pInputOrderAction, nRequestID)
+        oid = order.OrderRef
+        rorder = ustruct.Order(
+                    InstrumentID = corder.InstrumentID,
+                    OrderRef = corder.OrderRef,
+                )
+        self.myagent.rtn_order(rorder)
 
 
 class UserMock(object):
