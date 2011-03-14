@@ -120,7 +120,7 @@ class NULLAgent(object):
         pass
 
 
-from agent import MdApi,MdSpiDelegate,c,INSTS
+from agent import MdApi,MdSpiDelegate,c,INSTS_SAVE
 
 def user_save2():
     logging.basicConfig(filename="ctp_user.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
@@ -131,12 +131,12 @@ def user_save2():
     cuser_wt1= c.GD_USER_2  #网通
     cuser_wt2= c.GD_USER_4  #网通
 
-    my_agent = NULLAgent(None,None,INSTS)
+    my_agent = NULLAgent(None,None,INSTS_SAVE)
 
-    #agent.make_user(my_agent,cuser0,'data')
-    agent.make_user(my_agent,cuser1,'data')
-    agent.make_user(my_agent,cuser2,'data')
-    agent.make_user(my_agent,cuser_wt2,'data')
+    agent.make_user(my_agent,cuser0,'data')
+    #agent.make_user(my_agent,cuser1,'data')
+    #agent.make_user(my_agent,cuser2,'data')
+    #agent.make_user(my_agent,cuser_wt2,'data')
 
     #while True:
     #    time.sleep(1)
