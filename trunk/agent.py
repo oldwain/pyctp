@@ -10,7 +10,7 @@ todo:
     3. 行情数据的整理
     4. trader桩的建立,根据trade桩模拟交易
     5. 中间环境的恢复,如持仓. 
-       断点间的撤单--可延后 
+       断点间的撤单--可延后. 要求撤单/委托动作都撤销后才能重起程序
     6. 完全模拟交易
     7. 有人值守实盘
 
@@ -47,7 +47,35 @@ THOST_TERT_QUICK    = 2
 
 NFUNC = lambda data:None    #空函数桩
 
-INSTS = [u'IF1103',u'IF1104']  #必须采用ctp使用的合约名字，内部不做检验
+INSTS = [
+         u'IF1103',u'IF1104',
+         u'zn1104',u'zn1105'
+        ]
+
+INSTS_SAVE = [
+         u'IF1103',u'IF1104',
+         #郑州   
+         u'CF109',u'CF111',
+         u'ER109',u'ER111',
+         u'RO109',u'RO111',
+         u'TA105',u'TA106',
+         u'WA109',u'WS111',
+         #大连
+         u'm1109',u'm1111',
+         u'c1109',u'c1111',
+         u'y1109',u'y1111',
+         u'a1201',u'a1203',
+         u'l1105',u'l1106',
+         u'p1109',u'p1111',
+         u'v1105',u'v1106',
+         #上海
+         u'rb1110',u'rb1111',
+         u'zn1105',u'zn1106',
+         u'al1105',u'al1106',
+         u'cu1105',u'cu1106',
+         u'ru1105',u'ru1106',
+         u'fu1105',u'fu1106',
+         ]  #必须采用ctp使用的合约名字，内部不做检验
 #INSTS = [u'IF1103']  #必须采用ctp使用的合约名字，内部不做检验
 #建议每跟踪的一个合约都使用一个行情-交易对. 因为行情的接收是阻塞式的,在做处理的时候会延误后面接收的行情
 #套利时每一对合约都用一个行情-交易对
@@ -124,7 +152,7 @@ class MdSpiDelegate(MdSpi):
                 logger.warning(u'收到未订阅的行情:%s' %(depth_market_data.InstrumentID,))
             #self.logger.debug(u'收到行情:%s,time=%s:%s' %(depth_market_data.InstrumentID,depth_market_data.UpdateTime,depth_market_data.UpdateMillisec))
             dp = depth_market_data
-            self.logger.debug(u'收到行情，inst=%s,time=%s，volume=%s,last_volume=%s' % (dp.InstrumentID,dp.UpdateTime,dp.Volume,self.last_map[dp.InstrumentID]))
+            #self.logger.debug(u'收到行情，inst=%s,time=%s，volume=%s,last_volume=%s' % (dp.InstrumentID,dp.UpdateTime,dp.Volume,self.last_map[dp.InstrumentID]))
             if dp.Volume <= self.last_map[dp.InstrumentID]:
                 self.logger.debug(u'行情无变化，inst=%s,time=%s，volume=%s,last_volume=%s' % (dp.InstrumentID,dp.UpdateTime,dp.Volume,self.last_map[dp.InstrumentID]))
                 return  #行情未变化
@@ -153,20 +181,24 @@ class MdSpiDelegate(MdSpi):
 
     def market_data2tick(self,market_data):
         #market_data的格式转换和整理, 交易数据都转换为整数
-        rev = BaseObject(instrument = market_data.InstrumentID)
-        rev.date = int(market_data.TradingDay)
-        rev.min1 = int(market_data.UpdateTime[:2]+market_data.UpdateTime[3:5])
-        rev.sec = int(market_data.UpdateTime[-2:])
-        rev.msec = int(market_data.UpdateMillisec)
-        rev.holding = int(market_data.OpenInterest+0.1)
-        rev.dvolume = market_data.Volume
-        rev.price = int(market_data.LastPrice*10+0.1)
-        rev.high = int(market_data.HighestPrice*10+0.1)
-        rev.low = int(market_data.LowestPrice*10+0.1)
-        rev.bid_price = int(market_data.BidPrice1*10+0.1)
-        rev.bid_volume = market_data.BidVolume1
-        rev.ask_price = int(market_data.AskPrice1*10+0.1)
-        rev.ask_volume = market_data.AskVolume1
+        try:
+            #rev的后四个字段在模拟行情中经常出错
+            rev = BaseObject(instrument = market_data.InstrumentID,bid_price=0,bid_volume=0,ask_price=0,ask_volume=0)
+            rev.date = int(market_data.TradingDay)
+            rev.min1 = int(market_data.UpdateTime[:2]+market_data.UpdateTime[3:5])
+            rev.sec = int(market_data.UpdateTime[-2:])
+            rev.msec = int(market_data.UpdateMillisec)
+            rev.holding = int(market_data.OpenInterest+0.1)
+            rev.dvolume = market_data.Volume
+            rev.price = int(market_data.LastPrice*10+0.1)
+            rev.high = int(market_data.HighestPrice*10+0.1)
+            rev.low = int(market_data.LowestPrice*10+0.1)
+            rev.bid_price = int(market_data.BidPrice1*10+0.1)
+            rev.bid_volume = market_data.BidVolume1
+            rev.ask_price = int(market_data.AskPrice1*10+0.1)
+            rev.ask_volume = market_data.AskVolume1
+        except Exception,inst:
+            self.logger.warning(u'行情数据转换错误:%s' % str(inst))
         return rev
 
 class TraderSpiDelegate(TraderSpi):
@@ -324,8 +356,8 @@ class TraderSpiDelegate(TraderSpi):
 
     def OnRspQryInvestorPosition(self, pInvestorPosition, pRspInfo, nRequestID, bIsLast):
         '''请求查询投资者持仓响应'''
-        print u'查询持仓响应',str(pInvestorPosition),str(pRspInfo)
-        if bIsLast and self.isRspSuccess(pRspInfo):
+        #print u'查询持仓响应',str(pInvestorPosition),str(pRspInfo)
+        if self.isRspSuccess(pRspInfo): #每次一个单独的数据报
             self.agent.rsp_qry_position(pInvestorPosition)
         else:
             #logging
@@ -333,25 +365,25 @@ class TraderSpiDelegate(TraderSpi):
 
     def OnRspQryInvestorPositionDetail(self, pInvestorPositionDetail, pRspInfo, nRequestID, bIsLast):
         '''请求查询投资者持仓明细响应'''
-        print str(pInvestorPositionDetail)
-        if bIsLast and self.isRspSuccess(pRspInfo):
+        #print str(pInvestorPositionDetail)
+        if self.isRspSuccess(pRspInfo): #每次一个单独的数据报
             self.agent.rsp_qry_position_detail(pInvestorPositionDetail)
         else:
             #logging
             pass
 
 
-    def OnRspError(self, pRspInfo, nRequestID, bIsLast):
-        '''错误应答'''
-        #logging
-        pass
+    def OnRspError(self, info, RequestId, IsLast):
+        ''' 错误应答
+        '''
+        self.logger.error(u'requestID:%s,IsLast:%s,info:%s' % (RequestId,IsLast,str(info)))
 
     def OnRspQryOrder(self, pOrder, pRspInfo, nRequestID, bIsLast):
         '''请求查询报单响应'''
         if bIsLast and self.isRspSuccess(pRspInfo):
             self.agent.rsp_qry_order(pOrder)
         else:
-            #logging
+            self.logger.error(u'requestID:%s,IsLast:%s,info:%s' % (nRequestID,bIsLast,str(pRspInfo)))
             pass
 
     def OnRspQryTrade(self, pTrade, pRspInfo, nRequestID, bIsLast):
@@ -436,6 +468,7 @@ class Agent(object):
         self.cuser = cuser
         self.instruments = instruments
         self.request_id = 1
+        self.initialized = False
         self.data_funcs = []  #计算函数集合. 如计算各类指标, 顺序关系非常重要
                               #每一类函数由一对函数组成，.sfunc计算序列用，.func1为动态计算用，只计算当前值
                               #接口为(data), 从data的属性中取数据,并计算另外一些属性
@@ -458,7 +491,7 @@ class Agent(object):
         self.scur_day = int(time.strftime('%Y%m%d'))
         #当前资金/持仓
         self.available = 0  #可用资金
-        self.position = []
+        self.position = {}  #instrument_id ==>BaseObject(instrument_id,hlong,hshort,clong,cshort) #历史多、历史空、今日多、今日空
         #保证金率
         self.marginrate = {}
 
@@ -503,11 +536,11 @@ class Agent(object):
         ##必须先把持仓初始化成配置值或者0
         self.commands.append(self.fetch_trading_account)
         for inst in self.instruments:
-            
+            self.position[inst] = BaseObject(instrument_id = inst,clong=0,cshort=0,hlong=0,hshort=0)
             self.commands.append(fcustom(self.fetch_instrument_marginrate,instrument_id = inst))
             self.commands.append(fcustom(self.fetch_investor_position,instrument_id = inst))
-            
         self.check_qry_commands()
+        self.initialized = True #避免因为断开后自动重连造成的重复访问
 
     def check_qry_commands(self):
         #必然是在rsp中要发出另一个查询
@@ -808,6 +841,7 @@ class Agent(object):
                 1. 获得必要的历史数据
                 2. 获得当日分钟数据, 并计算相关指标
                 3. 获得当日持仓，并初始化止损. 
+                暂时要求历史数据和当日已发生的分钟数据保存在一个文件里面整体读取
         '''
         pass
 
@@ -815,6 +849,13 @@ class Agent(object):
     ###交易
 
     ###回应
+    def rtn_trade(self,strade):
+        '''
+            成交回报
+            必须处理策略分类持仓汇总和持仓总数不匹配时的问题
+        '''
+        pass    #需要处理分类持仓
+
     def rtn_order(self,sorder):
         '''
             ctp/交易所接受下单/撤单回报,不区分ctp和交易所
@@ -829,12 +870,6 @@ class Agent(object):
         '''
         pass    #可以忽略
 
-    def rtn_trade(self,strade):
-        '''
-            成交回报
-        '''
-        pass    #需要记录
-
     def err_order_action(self,order_ref,instrument_id,error_id,error_msg):
         '''
             ctp/交易所撤单错误回报，不区分ctp和交易所
@@ -845,9 +880,22 @@ class Agent(object):
     ###辅助   
     def rsp_qry_position(self,position):
         '''
-            查询持仓回报, 得到持仓的一多一空
+            查询持仓回报, 每个合约最多得到4个持仓回报，历史多/空、今日多/空
         '''
-        print u'agent 持仓:',str(position)
+        #print u'agent 持仓:',str(position)
+        if position != None:    
+            if position.PosiDirection == utype.THOST_FTDC_PD_Long:
+                if position.PositionDate == utype.THOST_FTDC_PSD_Today:
+                    self.position[position.InstrumentID].clong = position.Position  #TodayPosition
+                else:
+                    self.position[position.InstrumentID].hlong = position.Position  #YdPosition
+            else:#空头
+                if position.PositionDate == utype.THOST_FTDC_PSD_Today:
+                    self.position[position.InstrumentID].cshort = position.Position #TodayPosition
+                else:
+                    self.position[position.InstrumentID].hshort = position.Position #YdPosition
+        else:#无持仓信息，保持默认设置
+            pass
         self.check_qry_commands() 
 
     def rsp_qry_instrument_marginrate(self,marginRate):
@@ -858,24 +906,25 @@ class Agent(object):
         print str(marginRate)
         self.check_qry_commands()
 
-    def rsp_qry_instrument(self):
-        '''
-            暂时忽略
-        '''
-        self.check_qry_commands()
-
     def rsp_qry_trading_account(self,account):
         '''
             查询资金帐户回报
         '''
         self.available = account.Available
         self.check_qry_commands()        
+    
+    def rsp_qry_instrument(self):
+        '''
+            暂时忽略
+        '''
+        self.check_qry_commands()
 
     def rsp_qry_position_detail(self,position_detail):
         '''
             查询持仓明细回报, 得到每一次成交的持仓,其中若已经平仓,则持量为0,平仓量>=1
-            可以忽略
+            必须忽略
         '''
+        print str(position_detail)
         self.check_qry_commands()
 
     def rsp_qry_order(self,sorder):
@@ -979,8 +1028,8 @@ myagent.spi.OnErrRtnOrderAction(agent.BaseObject(OrderRef='12',InstrumentID='IF1
 #资金和持仓
 myagent.fetch_trading_account()
 myagent.fetch_investor_position(u'IF1103')
-#myagent.fetch_investor_position_detail(u'IF1103')
 myagent.fetch_instrument_marginrate(u'IF1103')
+#myagent.fetch_investor_position_detail(u'IF1103')
 
 
 #测试报单
