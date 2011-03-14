@@ -268,7 +268,6 @@ class TraderSpiDelegate(TraderSpi):
             self.logger.info(u'结算单内容:%s' % pSettlementInfo.Content)
             self.confirm_settlement_info()
         else:
-            time.sleep(1)
             self.agent.initialize()
             
 
@@ -283,11 +282,9 @@ class TraderSpiDelegate(TraderSpi):
                     self.logger.info(u'最新结算单未确认，需查询后再确认,最后确认时间=%s,scur_day:%s' % (pSettlementInfoConfirm.ConfirmDate,self.scur_day))
                 else:
                     self.logger.info(u'结算单确认结果为None')
-                time.sleep(1)   #满足1秒一次的查询间隔,避免流控
                 self.query_settlement_info()
             else:
                 self.logger.info(u'最新结算单已确认，不需再次确认,最后确认时间=%s,scur_day:%s' % (pSettlementInfoConfirm.ConfirmDate,self.scur_day))
-                time.sleep(1)
                 self.agent.initialize()
 
 
@@ -295,7 +292,6 @@ class TraderSpiDelegate(TraderSpi):
         '''投资者结算结果确认响应'''
         if(self.resp_common(pRspInfo,bIsLast,u'结算单确认')>0):
             self.logger.info(u'结算单确认时间: %s-%s' %(pSettlementInfoConfirm.ConfirmDate,pSettlementInfoConfirm.ConfirmTime))
-        time.sleep(1)
         self.agent.initialize()
 
 
