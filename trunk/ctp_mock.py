@@ -133,10 +133,10 @@ def user_save2():
 
     my_agent = NULLAgent(None,None,INSTS_SAVE)
 
-    agent.make_user(my_agent,cuser0,'data')
-    #agent.make_user(my_agent,cuser1,'data')
-    #agent.make_user(my_agent,cuser2,'data')
-    #agent.make_user(my_agent,cuser_wt2,'data')
+    #agent.make_user(my_agent,cuser0,'data')
+    agent.make_user(my_agent,cuser1,'data')
+    agent.make_user(my_agent,cuser2,'data')
+    agent.make_user(my_agent,cuser_wt2,'data')
 
     #while True:
     #    time.sleep(1)
