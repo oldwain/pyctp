@@ -107,6 +107,7 @@ class MdSpiDelegate(MdSpi):
         self.agent = agent
         #self.last_map = dict([(id,0) for id in instruments])
         self.last_map.update(dict([(id,0) for id in instruments]))
+        self.scur_day = int(time.strftime('%Y%m%d'))
 
     def checkErrorRspInfo(self, info):
         if info.ErrorID !=0:
@@ -173,7 +174,10 @@ class MdSpiDelegate(MdSpi):
         ff = open(hreader.make_tick_filename(ctick.instrument),'a+')
         #print type(dp.UpdateMillisec),type(dp.OpenInterest),type(dp.Volume),type(dp.BidVolume1)
         #ff.write(u'%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' % (dp.TradingDay,dp.UpdateTime,dp.UpdateMillisec,dp.OpenInterest,dp.Volume,dp.LastPrice,dp.HighestPrice,dp.LowestPrice,dp.BidPrice1,dp.BidVolume1,dp.AskPrice1,dp.AskVolume1))
-        ff.write(u'%(instrument)s,%(date)s,%(min1)s,%(sec)s,%(msec)s,%(holding)s,%(dvolume)s,%(price)s,%(high)s,%(low)s,%(bid_price)s,%(bid_volume)s,%(ask_price)s,%(ask_volume)s\n' % ctick.__dict__)
+        try:
+            ff.write(u'%(instrument)s,%(date)s,%(min1)s,%(sec)s,%(msec)s,%(holding)s,%(dvolume)s,%(price)s,%(high)s,%(low)s,%(bid_price)s,%(bid_volume)s,%(ask_price)s,%(ask_volume)s\n' % ctick.__dict__)
+        except Exception,inst:
+            print str(depth_market_data),str(depth_market_data.TradingDay),str(depth_market_data.UpdateTime)
         ff.close()
         self.logger.debug(u'after write md:')
         #time.sleep(0.3)
@@ -183,8 +187,7 @@ class MdSpiDelegate(MdSpi):
         #market_data的格式转换和整理, 交易数据都转换为整数
         try:
             #rev的后四个字段在模拟行情中经常出错
-            rev = BaseObject(instrument = market_data.InstrumentID,bid_price=0,bid_volume=0,ask_price=0,ask_volume=0)
-            rev.date = int(market_data.TradingDay)
+            rev = BaseObject(instrument = market_data.InstrumentID,date=self.scur_day,bid_price=0,bid_volume=0,ask_price=0,ask_volume=0)
             rev.min1 = int(market_data.UpdateTime[:2]+market_data.UpdateTime[3:5])
             rev.sec = int(market_data.UpdateTime[-2:])
             rev.msec = int(market_data.UpdateMillisec)
@@ -197,6 +200,7 @@ class MdSpiDelegate(MdSpi):
             rev.bid_volume = market_data.BidVolume1
             rev.ask_price = int(market_data.AskPrice1*10+0.1)
             rev.ask_volume = market_data.AskVolume1
+            rev.date = int(market_data.TradingDay)
         except Exception,inst:
             self.logger.warning(u'行情数据转换错误:%s' % str(inst))
         return rev
