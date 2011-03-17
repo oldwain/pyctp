@@ -115,7 +115,6 @@ class MdSpiDelegate(MdSpi):
         self.agent = agent
         ##必须在每日重新连接时初始化它. 这一点用到了生产行情服务器收盘后关闭的特点(模拟的不关闭)
         self.last_map = dict([(id,0) for id in instruments])
-        self.scur_day = int(time.strftime('%Y%m%d'))
 
     def checkErrorRspInfo(self, info):
         if info.ErrorID !=0:
@@ -139,8 +138,8 @@ class MdSpiDelegate(MdSpi):
     def OnRspUserLogin(self, userlogin, info, rid, is_last):
         self.logger.info(u'user login,info:%s,rid:%s,is_last:%s' % (info,rid,is_last))
         scur_day = int(time.strftime('%Y%m%d'))
-        if scur_day > self.scur_day:    #换日,重新设置volume
-            self.scur_day = scur_day
+        if scur_day > self.agent.scur_day:    #换日,重新设置volume
+            self.agent.scur_day = scur_day
             self.last_map = dict([(id,0) for id in self.instruments])
         if is_last and not self.checkErrorRspInfo(info):
             self.logger.info(u"get today's trading day:%s" % repr(self.api.GetTradingDay()))
@@ -196,7 +195,7 @@ class MdSpiDelegate(MdSpi):
         #market_data的格式转换和整理, 交易数据都转换为整数
         try:
             #rev的后四个字段在模拟行情中经常出错
-            rev = BaseObject(instrument = market_data.InstrumentID,date=self.scur_day,bid_price=0,bid_volume=0,ask_price=0,ask_volume=0)
+            rev = BaseObject(instrument = market_data.InstrumentID,date=self.agent.scur_day,bid_price=0,bid_volume=0,ask_price=0,ask_volume=0)
             rev.min1 = int(market_data.UpdateTime[:2]+market_data.UpdateTime[3:5])
             rev.sec = int(market_data.UpdateTime[-2:])
             rev.msec = int(market_data.UpdateMillisec)
@@ -233,7 +232,6 @@ class TraderSpiDelegate(TraderSpi):
         self.passwd = passwd
         self.agent = agent
         self.agent.set_spi(self)
-        self.scur_day = int(time.strftime('%Y%m%d'))
  
     def isRspSuccess(self,RspInfo):
         return RspInfo == None or RspInfo.ErrorID == 0
@@ -321,15 +319,15 @@ class TraderSpiDelegate(TraderSpi):
         self.logger.debug(u"结算单确认信息查询响应:rspInfo=%s,结算单确认=%s" % (pRspInfo,pSettlementInfoConfirm))
         #self.query_settlement_info()
         if(self.resp_common(pRspInfo,bIsLast,u'结算单确认情况查询')>0):
-            if(pSettlementInfoConfirm == None or int(pSettlementInfoConfirm.ConfirmDate) < self.scur_day):
+            if(pSettlementInfoConfirm == None or int(pSettlementInfoConfirm.ConfirmDate) < self.agent.scur_day):
                 #其实这个判断是不对的，如果周日对周五的结果进行了确认，那么周一实际上已经不需要再次确认了
                 if(pSettlementInfoConfirm != None):
-                    self.logger.info(u'最新结算单未确认，需查询后再确认,最后确认时间=%s,scur_day:%s' % (pSettlementInfoConfirm.ConfirmDate,self.scur_day))
+                    self.logger.info(u'最新结算单未确认，需查询后再确认,最后确认时间=%s,scur_day:%s' % (pSettlementInfoConfirm.ConfirmDate,self.agent.scur_day))
                 else:
                     self.logger.info(u'结算单确认结果为None')
                 self.query_settlement_info()
             else:
-                self.logger.info(u'最新结算单已确认，不需再次确认,最后确认时间=%s,scur_day:%s' % (pSettlementInfoConfirm.ConfirmDate,self.scur_day))
+                self.logger.info(u'最新结算单已确认，不需再次确认,最后确认时间=%s,scur_day:%s' % (pSettlementInfoConfirm.ConfirmDate,self.agent.scur_day))
                 self.agent.initialize()
 
 
@@ -558,7 +556,6 @@ class Agent(AbsAgent):
         self.vlimit = dict(my_max_volume)
 
         #初始化
-        self.initialize_strategy()
         self.prepare_data_env()
 
 
@@ -1003,7 +1000,7 @@ def user_main():
 
     my_agent = Agent(None,None,INSTS,{},{})
 
-    make_user(my_agent,cuser1,'data1')
+    make_user(my_agent,cuser0,'data1')
     #make_user(my_agent,cuser2,'data2')    
     #make_user(my_agent,cuser_wt1,'data_wt1')
     #make_user(my_agent,cuser_wt2,'data_wt2')    
