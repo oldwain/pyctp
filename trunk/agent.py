@@ -17,9 +17,16 @@ todo:
     8. 生产环境必须考虑多个行情接入端, 有可能会出现延时情况.
 
 后续工作
-    B.1. 合约的自动匹配
+ B.1. 合约的自动匹配
 
-##周一提前行动?
+关注ifuncs1a
+xud_short_2
+rsi_long_x2
+xdown60
+up0
+ipmacd_long_t2
+acd_da_sz_b2
+
 
 ##因为流控原因,所有Qry命令都用Command模式?
   不需要,可以忍受1s的延时. 因为行情通过别的来接收  
@@ -28,6 +35,7 @@ todo:
 import time
 import logging
 import thread
+import bisect
 
 from base import *
 from dac import ATR,ATR1,STREND,STREND1,MA,MA1
@@ -105,8 +113,8 @@ class MdSpiDelegate(MdSpi):
         self.investor_id = investor_id
         self.passwd = passwd
         self.agent = agent
-        #self.last_map = dict([(id,0) for id in instruments])
-        self.last_map.update(dict([(id,0) for id in instruments]))
+        ##必须在每日重新连接时初始化它. 这一点用到了生产行情服务器收盘后关闭的特点(模拟的不关闭)
+        self.last_map = dict([(id,0) for id in instruments])
         self.scur_day = int(time.strftime('%Y%m%d'))
 
     def checkErrorRspInfo(self, info):
@@ -120,9 +128,6 @@ class MdSpiDelegate(MdSpi):
     def OnFrontDisConnected(self, reason):
         self.logger.info(u'front disconnected,reason:%s' % (reason,))
 
-    def OnHeartBeatWarning(self, time):
-        pass
-
     def OnFrontConnected(self):
         self.logger.info(u'front connected')
         self.user_login(self.broker_id, self.investor_id, self.passwd)
@@ -133,6 +138,10 @@ class MdSpiDelegate(MdSpi):
 
     def OnRspUserLogin(self, userlogin, info, rid, is_last):
         self.logger.info(u'user login,info:%s,rid:%s,is_last:%s' % (info,rid,is_last))
+        scur_day = int(time.strftime('%Y%m%d'))
+        if scur_day > self.scur_day:    #换日,重新设置volume
+            self.scur_day = scur_day
+            self.last_map = dict([(id,0) for id in self.instruments])
         if is_last and not self.checkErrorRspInfo(info):
             self.logger.info(u"get today's trading day:%s" % repr(self.api.GetTradingDay()))
             self.subscribe_market_data(self.instruments)
@@ -148,9 +157,9 @@ class MdSpiDelegate(MdSpi):
             #mylock.acquire()
             #self.logger.debug(u'获得锁.................,mylock.id=%s' % id(mylock))        
             if depth_market_data.LastPrice > 999999 or depth_market_data.LastPrice < 10:
-                logger.warning(u'收到的行情数据有误:%s,LastPrice=:%s' %(depth_market_data.InstrumentID,depth_market_data.LastPrice))
+                self.logger.warning(u'收到的行情数据有误:%s,LastPrice=:%s' %(depth_market_data.InstrumentID,depth_market_data.LastPrice))
             if depth_market_data.InstrumentID not in self.instruments:
-                logger.warning(u'收到未订阅的行情:%s' %(depth_market_data.InstrumentID,))
+                self.logger.warning(u'收到未订阅的行情:%s' %(depth_market_data.InstrumentID,))
             #self.logger.debug(u'收到行情:%s,time=%s:%s' %(depth_market_data.InstrumentID,depth_market_data.UpdateTime,depth_market_data.UpdateMillisec))
             dp = depth_market_data
             #self.logger.debug(u'收到行情，inst=%s,time=%s，volume=%s,last_volume=%s' % (dp.InstrumentID,dp.UpdateTime,dp.Volume,self.last_map[dp.InstrumentID]))
@@ -461,13 +470,47 @@ class TraderSpiDelegate(TraderSpi):
         self.agent.err_order_action(pOrderAction.OrderRef,pOrderAction.InstrumentID,pRspInfo.ErrorID,pRspInfo.ErrorMsg)
 
 
-class Agent(object):
+class AbsAgent(object):
+    ''' 抽取与交易无关的功能，便于单独测试
+    '''
+    def __init__(self):
+        ##命令队列(不区分查询和交易)
+        self.commands = []  #每个元素为(trigger_tick,func), 用于当tick==trigger_tick时触发func
+        self.tick = 0
+
+    def inc_tick(self):
+        self.tick += 1
+        self.check_commands()
+        return self.tick
+
+    def put_command(self,trigger_tick,command): #按顺序插入
+        cticks = [ttick for ttick,command in self.commands]
+        ii = bisect.bisect(cticks,trigger_tick)
+        self.commands.insert(ii,(trigger_tick,command))
+
+    def check_commands(self):   
+        '''
+            执行命令队列中触发时间<=当前tick的命令. 注意一个tick=0.5s
+            以后考虑一个tick只触发一个命令?
+        '''
+        l = len(self.commands)
+        i = 0
+        while(i<l and self.tick >= self.commands[i][0]):
+            self.commands[i][1]()
+            i += 1
+        del self.commands[0:i]
+
+
+class Agent(AbsAgent):
     logger = logging.getLogger('ctp.agent')
 
-    def __init__(self,trader,cuser,instruments):
+    def __init__(self,trader,cuser,instruments,my_strategy,my_max_volume):
         '''
             trader为交易对象
         '''
+        AbsAgent.__init__(self)
+        ##计时, 用来激发队列
+        ##
         self.trader = trader
         self.cuser = cuser
         self.instruments = instruments
@@ -478,16 +521,16 @@ class Agent(object):
                               #接口为(data), 从data的属性中取数据,并计算另外一些属性
                               #顺序关系非常重要，否则可能会紊乱
         self.strategy_map = {}
-        ###交易数据, instrument==>tdata的映射
+        ###行情数据, instrument==>tdata的映射
         #其中tdata.m1/m3/m5/m15/m30/d1为不同周期的数据
         #   tdata.cur_min是当前分钟的行情，包括开盘,最高,最低,当前价格,持仓,累计成交量
         #   tdata.cur_day是当日的行情，包括开盘,最高,最低,当前价格,持仓,累计成交量, 其中最高/最低有两类，一者是tick的当前价集合得到的，一者是tick中的最高/最低价得到的
         self.data = {}    #为合约号==>合约数据的dict
-        ###
+        ###交易
         self.lastupdate = 0
         self.holding = []   #(合约、策略族、基准价、基准时间、request_id、持仓量、止损价、止损函数)
         self.transited_orders = []    #发出后等待回报的指令, 回报后到holding
-        self.queued_orders = []     #因为保证金原因等待发出的指令(合约、策略族、基准价、基准时间(到秒))
+        #self.queued_orders = []     #因为保证金原因等待发出的指令(合约、策略族、基准价、基准时间(到秒))
         self.front_id = None
         self.session_id = None
         self.order_ref = 1
@@ -498,7 +541,10 @@ class Agent(object):
         self.position = {}  #instrument_id ==>BaseObject(instrument_id,hlong,hshort,clong,cshort) #历史多、历史空、今日多、今日空
         #保证金率
         self.marginrate = {}
-
+        ##查询命令队列
+        self.qry_commands = []  #每个元素为查询命令，用于初始化时查询相关数据
+        
+        #计算函数 sfunc为序列计算函数(用于初始计算), func1为动态计算函数(用于分钟完成时的即时运算)
         self.register_data_funcs(
                 BaseObject(sfunc=NFUNC,func1=hreader.time_period_switch),    #时间切换函数
                 BaseObject(sfunc=ATR,func1=ATR1),
@@ -506,10 +552,15 @@ class Agent(object):
                 BaseObject(sfunc=STREND,func1=STREND1),
             )
 
+        #策略   instrumentid ==> [(s1,stop1,maxvolume1),(s1,stop1,maxvolume2)]
+        self.strategy = dict(my_strategy)
+        #最大持仓手数 instrumentid ==> v
+        self.vlimit = dict(my_max_volume)
+
+        #初始化
+        self.initialize_strategy()
         self.prepare_data_env()
 
-        ##命令队列
-        self.commands = []
 
     def set_spi(self,spi):
         self.spi = spi
@@ -538,20 +589,20 @@ class Agent(object):
             初始化，如保证金率，账户资金等
         '''
         ##必须先把持仓初始化成配置值或者0
-        self.commands.append(self.fetch_trading_account)
+        self.qry_commands.append(self.fetch_trading_account)
         for inst in self.instruments:
             self.position[inst] = BaseObject(instrument_id = inst,clong=0,cshort=0,hlong=0,hshort=0)
-            self.commands.append(fcustom(self.fetch_instrument_marginrate,instrument_id = inst))
-            self.commands.append(fcustom(self.fetch_investor_position,instrument_id = inst))
+            self.qry_commands.append(fcustom(self.fetch_instrument_marginrate,instrument_id = inst))
+            self.qry_commands.append(fcustom(self.fetch_investor_position,instrument_id = inst))
         self.check_qry_commands()
         self.initialized = True #避免因为断开后自动重连造成的重复访问
 
     def check_qry_commands(self):
         #必然是在rsp中要发出另一个查询
-        if len(self.commands)>0:
-            time.sleep(1)
-            self.commands[0]()
-            del self.commands[0]
+        if len(self.qry_commands)>0:
+            time.sleep(1)   #这个只用于非行情期的执行. 
+            self.qry_commands[0]()
+            del self.qry_commands[0]
 
     def prepare_data_env(self):
         '''
@@ -562,34 +613,6 @@ class Agent(object):
             for dfo in self.data_funcs:
                 dfo.sfunc(dinst)
             
-    def register_strategy(self,strategys):
-        '''
-            策略注册. 简单版本，都按照100%用完合约分额计算. 这样，合约的某个策略集合持仓时，其它策略集合就不能再开仓
-            strategys是[(合约1,策略集1),(合约2,策略集2)]的对
-                其中一个合约可以对应多个策略，一个策略也可以对应多个合约
-        '''
-        for ins_id,s in strategys:
-            if ins_id not in self.strategy_map:
-                self.strategy_map[ins_id] = []
-            if s not in self.strategy_map[ins_id]:
-                self.strategy_map[ins_id].append((s,100)) 
-
-    def cregister_strategy(self,strategys):
-        '''
-            策略注册，复杂版本
-            strategys是[(合约1,策略集合1,手数占比),(合约2,策略集合2,手数占比)]的集合
-                其中一个合约可以对应多个策略集合
-            策略集合:
-                (策略,策略,策略)    其中这些策略可以相互平仓
-            手数占比:
-                0-100, 表示在该合约允许持仓数中的占比, 百分之一，并取整
-        '''
-        for ins_id,s,proportion in strategys:
-            if ins_id not in self.strategy_map:
-                self.strategy_map[ins_id] = []
-            self.strategy_map[ins_id].append((s,proportion))    #重复的话就会引发多次下单
-
-    
     def register_data_funcs(self,*funcss):
         for funcs in funcss:
             self.data_funcs.append(funcs)
@@ -636,7 +659,7 @@ class Agent(object):
         close_positions = self.check_close_signal()
         self.make_trade(close_positions)
         #再开仓.
-        open_signals = self.check_signal()
+        open_signals = self.check_signal(ctick)
         open_positions = self.calc_position(open_signals)
         self.make_trade(open_positions)
         #撤单, 撤销3分钟内未成交的以及等待发出队列中30秒内未发出的单子
@@ -734,11 +757,15 @@ class Agent(object):
         '''
         return []
 
-    def check_signal(self):
+    def check_signal(self,ctick):
         '''
-            检查信号并发出指令
-            信号包括开仓信号、平仓信号
+            检查开仓信号并发出指令
         '''
+        if ctick.instrument not in self.strategy:
+            return
+        if ctick.instrument not in self.data:
+            self.logger.warning(u'需要监控的%s未记录行情数据')
+            print u'需要监控的%s未记录行情数据'
         return []
 
     def cancel_orders(self):
@@ -974,7 +1001,7 @@ def user_main():
     cuser_wt1= c.GD_USER_2  #网通
     cuser_wt2= c.GD_USER_4  #网通
 
-    my_agent = Agent(None,None,INSTS)
+    my_agent = Agent(None,None,INSTS,{},{})
 
     make_user(my_agent,cuser1,'data1')
     #make_user(my_agent,cuser2,'data2')    
@@ -1005,7 +1032,7 @@ trader.RegisterSpi(None)
     trader = TraderApi.CreateTraderApi("trader")
     #cuser = c.SQ_TRADER1
     cuser = c.SQ_TRADER2
-    my_agent = Agent(trader,cuser,INSTS)
+    my_agent = Agent(trader,cuser,INSTS,{},{})
     myspi = TraderSpiDelegate(instruments=INSTS, 
                              broker_id=cuser.broker_id,
                              investor_id= cuser.investor_id,

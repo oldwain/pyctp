@@ -63,7 +63,7 @@ class MockMd(object):
     '''
     def __init__(self,instrument):
         self.instrument = instrument
-        self.agent = agent.Agent(None,None,[instrument])
+        self.agent = agent.Agent(None,None,[instrument],{},{})
 
     def play(self,tday=0):
         ticks = hreader.read_ticks(self.instrument,tday)
@@ -134,9 +134,9 @@ def user_save2():
     my_agent = NULLAgent(None,None,INSTS_SAVE)
 
     #agent.make_user(my_agent,cuser0,'data')
-    agent.make_user(my_agent,cuser1,'data')
-    agent.make_user(my_agent,cuser2,'data')
-    agent.make_user(my_agent,cuser_wt2,'data')
+    agent.make_user(my_agent,cuser1,'data1')
+    agent.make_user(my_agent,cuser2,'data2')
+    agent.make_user(my_agent,cuser_wt2,'data3')
 
     #while True:
     #    time.sleep(1)
