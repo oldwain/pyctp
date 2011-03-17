@@ -2,7 +2,7 @@
 
 IDATE,ITIME,IOPEN,ICLOSE,IHIGH,ILOW,IVOL,IHOLDING = 0,1,2,3,4,5,6,7
 
-
+import sys
 from functools import partial
 
 def fcustom(func,**kwargs):
@@ -41,5 +41,7 @@ class CommonObject(BaseObject):
         return 'CommonObject'
 
 
-
+LINELENGTH = 60
+def linelog(msg):   #在同一行覆盖显示日志输出
+    sys.stdout.write(unicode((u'\r%s%s' % (msg,' ' * (LINELENGTH - len(msg)))))) #.encode('gbk'))  #适应输出编码为gbk
 

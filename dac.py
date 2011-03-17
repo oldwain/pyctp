@@ -236,7 +236,6 @@ def ATR1(data):
         data.xatrd1.append(0)
         xatr1(data.atrd1,data.d1[ICLOSE],data.xatrd1)
     
-
 def STREND(data):
     '''
         计算趋势
