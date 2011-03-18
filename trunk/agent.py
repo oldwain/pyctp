@@ -169,7 +169,7 @@ class MdSpiDelegate(MdSpi):
             self.last_map[dp.InstrumentID] = dp.Volume
             #mylock.release()   #至此已经去掉重复的数据
 
-            self.logger.debug(u'after modify instrument=%s,lastvolume:%s,curVolume:%s' % (dp.InstrumentID,self.last_map[dp.InstrumentID],dp.Volume))
+            #self.logger.debug(u'after modify instrument=%s,lastvolume:%s,curVolume:%s' % (dp.InstrumentID,self.last_map[dp.InstrumentID],dp.Volume))
             #self.logger.debug(u'before loop')
             ctick = self.market_data2tick(depth_market_data)
             self.agent.RtnTick(ctick)
@@ -188,7 +188,7 @@ class MdSpiDelegate(MdSpi):
         except Exception,inst:
             print str(depth_market_data),str(depth_market_data.TradingDay),str(depth_market_data.UpdateTime)
         ff.close()
-        self.logger.debug(u'after write md:')
+        #self.logger.debug(u'after write md:')
         #time.sleep(0.3)
         #self.logger.debug(u'after write sleep:')
 
@@ -650,7 +650,7 @@ class Agent(AbsAgent):
 
     ##交易处理
     def RtnTick(self,ctick):#行情处理主循环
-        print u'in my lock, close长度:%s,ma_5长度:%s\n' %(len(self.data[ctick.instrument].sclose),len(self.data[ctick.instrument].ma_5))
+        #print u'in my lock, close长度:%s,ma_5长度:%s\n' %(len(self.data[ctick.instrument].sclose),len(self.data[ctick.instrument].ma_5))
         inst = ctick.instrument
         self.prepare_tick(ctick)
         #先平仓
@@ -666,7 +666,7 @@ class Agent(AbsAgent):
         self.check_queued()
         ##扫尾
         self.finalize()
-        print u'after my lock, close长度:%s,ma_5长度:%s\n' %(len(self.data[ctick.instrument].sclose),len(self.data[ctick.instrument].ma_5))
+        #print u'after my lock, close长度:%s,ma_5长度:%s\n' %(len(self.data[ctick.instrument].sclose),len(self.data[ctick.instrument].ma_5))
         
     def prepare_tick(self,ctick):
         '''
