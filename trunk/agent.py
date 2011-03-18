@@ -114,7 +114,7 @@ class MdSpiDelegate(MdSpi):
         self.passwd = passwd
         self.agent = agent
         ##必须在每日重新连接时初始化它. 这一点用到了生产行情服务器收盘后关闭的特点(模拟的不关闭)
-        self.last_map = dict([(id,0) for id in instruments])
+        MdSpiDelegate.last_map = dict([(id,0) for id in instruments])
 
     def checkErrorRspInfo(self, info):
         if info.ErrorID !=0:
@@ -139,8 +139,9 @@ class MdSpiDelegate(MdSpi):
         self.logger.info(u'user login,info:%s,rid:%s,is_last:%s' % (info,rid,is_last))
         scur_day = int(time.strftime('%Y%m%d'))
         if scur_day > self.agent.scur_day:    #换日,重新设置volume
+            print u'换日, %s-->%s' % (self.agent.scur_day,scur_day)
             self.agent.scur_day = scur_day
-            self.last_map = dict([(id,0) for id in self.instruments])
+            MdSpiDelegate.last_map = dict([(id,0) for id in self.instruments])
         if is_last and not self.checkErrorRspInfo(info):
             self.logger.info(u"get today's trading day:%s" % repr(self.api.GetTradingDay()))
             self.subscribe_market_data(self.instruments)
@@ -161,7 +162,7 @@ class MdSpiDelegate(MdSpi):
                 self.logger.warning(u'收到未订阅的行情:%s' %(depth_market_data.InstrumentID,))
             #self.logger.debug(u'收到行情:%s,time=%s:%s' %(depth_market_data.InstrumentID,depth_market_data.UpdateTime,depth_market_data.UpdateMillisec))
             dp = depth_market_data
-            #self.logger.debug(u'收到行情，inst=%s,time=%s，volume=%s,last_volume=%s' % (dp.InstrumentID,dp.UpdateTime,dp.Volume,self.last_map[dp.InstrumentID]))
+            self.logger.debug(u'收到行情，inst=%s,time=%s，volume=%s,last_volume=%s' % (dp.InstrumentID,dp.UpdateTime,dp.Volume,self.last_map[dp.InstrumentID]))
             if dp.Volume <= self.last_map[dp.InstrumentID]:
                 self.logger.debug(u'行情无变化，inst=%s,time=%s，volume=%s,last_volume=%s' % (dp.InstrumentID,dp.UpdateTime,dp.Volume,self.last_map[dp.InstrumentID]))
                 return  #行情未变化
