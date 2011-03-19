@@ -2,6 +2,9 @@
 
 IDATE,ITIME,IOPEN,ICLOSE,IHIGH,ILOW,IVOL,IHOLDING = 0,1,2,3,4,5,6,7
 
+LONG,SHORT,EMPTY = -1,1,0   #多仓出钱,淡仓收钱
+
+
 import sys
 from functools import partial
 
@@ -13,6 +16,15 @@ def fcustom(func,**kwargs):
     pf.paras = ','.join(['%s=%s' % item for item in pf.keywords.items()])
     pf.__name__ = '%s:%s' % (func.__name__,pf.paras)
     return pf
+
+def func_name(func):    #取到真实函数名. 可能只适用于python2.x
+    if 'name' in func.__dict__:
+        return func.name
+    cfunc = func
+    while(isinstance(cfunc,functools.partial)):
+        cfunc = cfunc.func
+    return str(cfunc)[10:-15]
+
 
 
 class BaseObject(object):

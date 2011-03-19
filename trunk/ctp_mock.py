@@ -69,7 +69,7 @@ class MockMd(object):
         ticks = hreader.read_ticks(self.instrument,tday)
         for tick in ticks:
             self.agent.RtnTick(tick)
-            self.agent.RtnTick(tick)
+            #self.agent.RtnTick(tick)
 
 import time
 import logging
@@ -121,6 +121,25 @@ class NULLAgent(object):
 
 
 from agent import MdApi,MdSpiDelegate,c,INSTS_SAVE
+
+def user_save1():
+    logging.basicConfig(filename="ctp_user.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
+
+    cuser0 = c.SQ_USER
+    cuser1 = c.GD_USER
+    cuser2 = c.GD_USER_3
+    cuser_wt1= c.GD_USER_2  #网通
+    cuser_wt2= c.GD_USER_4  #网通
+
+    my_agent = NULLAgent(None,None,INSTS_SAVE)
+
+    agent.make_user(my_agent,cuser0,'data')
+
+    #while True:
+    #    time.sleep(1)
+
+    return my_agent
+
 
 def user_save2():
     logging.basicConfig(filename="ctp_user.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
