@@ -56,12 +56,12 @@ THOST_TERT_QUICK    = 2
 NFUNC = lambda data:None    #空函数桩
 
 INSTS = [
-         u'IF1103',u'IF1104',
+         u'IF1104',u'IF1105',
          u'zn1104',u'zn1105'
         ]
 
 INSTS_SAVE = [
-         u'IF1103',u'IF1104',
+         u'IF1104',u'IF1105',
          #郑州   
          u'CF109',u'CF111',
          u'ER109',u'ER111',
@@ -102,13 +102,13 @@ class MdSpiDelegate(MdSpi):
     last_map = {}
 
     def __init__(self,
-            instruments, #合约列表
+            instruments, #合约映射 name ==>c_instrument
             broker_id,   #期货公司ID
             investor_id, #投资者ID
             passwd, #口令
             agent,  #实际操作对象
         ):        
-        self.instruments = instruments
+        self.instruments = set([name for name in instruments])
         self.broker_id =broker_id
         self.investor_id = investor_id
         self.passwd = passwd
@@ -221,13 +221,13 @@ class TraderSpiDelegate(TraderSpi):
     '''
     logger = logging.getLogger('ctp.TraderSpiDelegate')    
     def __init__(self,
-            instruments, #合约列表
+            instruments, #合约映射 name ==>c_instrument 
             broker_id,   #期货公司ID
             investor_id, #投资者ID
             passwd, #口令
             agent,  #实际操作对象
         ):        
-        self.instruments = instruments
+        self.instruments = set([name for name in instruments])
         self.broker_id =broker_id
         self.investor_id = investor_id
         self.passwd = passwd
@@ -354,6 +354,17 @@ class TraderSpiDelegate(TraderSpi):
             #logging
             pass
 
+    def OnRspQryInstrument(self, pInstrument, pRspInfo, nRequestID, bIsLast):
+        '''
+            合约回报。
+        '''
+        if bIsLast and self.isRspSuccess(pRspInfo):
+            self.agent.rsp_qry_instrument(pInstrument)
+        else:
+            #logging
+            pass
+
+
     def OnRspQryTradingAccount(self, pTradingAccount, pRspInfo, nRequestID, bIsLast):
         '''
             请求查询资金账户响应
@@ -469,6 +480,53 @@ class TraderSpiDelegate(TraderSpi):
         self.agent.err_order_action(pOrderAction.OrderRef,pOrderAction.InstrumentID,pRspInfo.ErrorID,pRspInfo.ErrorMsg)
 
 
+SLIPPAGE_RESERVE = 0.01 #1%的滑点计差, 用于估算开仓量
+class c_instrument(object):
+    @staticmethod
+    def create_instruments(names,strategy):
+        '''根据名称序列和策略序列创建instrument
+           其中策略序列的结构为:
+           [总最大持仓量,(策略名1，止损函数, 当次开仓数，最大持仓数),(策略名2，止损函数, 当次开仓数，最大持仓数)...] 
+        '''
+        objs = dict([(name,c_instrument(name)) for name in names])
+        for name,item in strategy:
+            if name not in objs:
+                print u'合约%s不在盯盘列表中' % (name,)
+                continue
+            objs[name].max_volume = item[0]
+            objs[name].strategy = dict([(u'%s-%s' % (func_name(ss[0]),func_name(ss[1])),BaseObject(name=u'%s-%s' % (func_name(ss[0]),func_name(ss[1])),opener=ss[0],stoper=ss[1],direction=ss[2],open_volume=ss[3],max_holding=ss[4])) for ss in item[1:]])   #策略以开仓方法+平仓方法为名
+        return objs
+
+    def __init__(self,name):
+        self.name = name
+        #保证金率
+        self.marginrate = (0,0) #(多,空)
+        #合约乘数
+        self.multiple = 0
+        #最小跳动
+        self.tick_base = 0
+        #持仓量
+        #BaseObject(hlong,hshort,clong,cshort) #历史多、历史空、今日多、今日空 #必须与实际数据一致, 实际上没用到
+        self.position = BaseObject(hlong=0,hshort=0,clong=0,cshort=0)
+        #持仓明细策略==>(合约、策略、基准价、基准时间、request_id、持仓量、当前止损价)
+        self.position_detail = {}   #需要在Agent的resume中恢复
+        #设定的最大持仓手数
+        self.max_volume = 1
+
+        #应用策略 开仓函数名 ==> BaseObject(instrument_id,strategy_name,position_type,volume,stoper)
+        self.strategy = {}
+        
+        #行情数据
+        #其中tdata.m1/m3/m5/m15/m30/d1为不同周期的数据
+        #   tdata.cur_min是当前分钟的行情，包括开盘,最高,最低,当前价格,持仓,累计成交量
+        #   tdata.cur_day是当日的行情，包括开盘,最高,最低,当前价格,持仓,累计成交量, 其中最高/最低有两类，一者是tick的当前价集合得到的，一者是tick中的最高/最低价得到的
+        self.data = BaseObject()
+
+    def margin_amount(self,price,direction):   #所有price以0.1为基准
+        my_marginrate = self.marginrate[0] if direction == LONG else self.marginrate[1]
+        return price / 10.0 * self.multiple * my_marginrate * (1+SLIPPAGE_RESERVE)
+
+
 class AbsAgent(object):
     ''' 抽取与交易无关的功能，便于单独测试
     '''
@@ -503,7 +561,7 @@ class AbsAgent(object):
 class Agent(AbsAgent):
     logger = logging.getLogger('ctp.agent')
 
-    def __init__(self,trader,cuser,instruments,my_strategy,my_max_volume):
+    def __init__(self,trader,cuser,instruments,my_strategy):
         '''
             trader为交易对象
         '''
@@ -512,22 +570,15 @@ class Agent(AbsAgent):
         ##
         self.trader = trader
         self.cuser = cuser
-        self.instruments = instruments
+        self.instruments = c_instrument.create_instruments(instruments,my_strategy)
         self.request_id = 1
         self.initialized = False
         self.data_funcs = []  #计算函数集合. 如计算各类指标, 顺序关系非常重要
                               #每一类函数由一对函数组成，.sfunc计算序列用，.func1为动态计算用，只计算当前值
                               #接口为(data), 从data的属性中取数据,并计算另外一些属性
                               #顺序关系非常重要，否则可能会紊乱
-        self.strategy_map = {}
-        ###行情数据, instrument==>tdata的映射
-        #其中tdata.m1/m3/m5/m15/m30/d1为不同周期的数据
-        #   tdata.cur_min是当前分钟的行情，包括开盘,最高,最低,当前价格,持仓,累计成交量
-        #   tdata.cur_day是当日的行情，包括开盘,最高,最低,当前价格,持仓,累计成交量, 其中最高/最低有两类，一者是tick的当前价集合得到的，一者是tick中的最高/最低价得到的
-        self.data = {}    #为合约号==>合约数据的dict
         ###交易
         self.lastupdate = 0
-        self.holding = []   #(合约、策略族、基准价、基准时间、request_id、持仓量、止损价、止损函数)
         self.transited_orders = []    #发出后等待回报的指令, 回报后到holding
         #self.queued_orders = []     #因为保证金原因等待发出的指令(合约、策略族、基准价、基准时间(到秒))
         self.front_id = None
@@ -537,9 +588,6 @@ class Agent(AbsAgent):
         self.scur_day = int(time.strftime('%Y%m%d'))
         #当前资金/持仓
         self.available = 0  #可用资金
-        self.position = {}  #instrument_id ==>BaseObject(instrument_id,hlong,hshort,clong,cshort) #历史多、历史空、今日多、今日空
-        #保证金率
-        self.marginrate = {}
         ##查询命令队列
         self.qry_commands = []  #每个元素为查询命令，用于初始化时查询相关数据
         
@@ -550,11 +598,6 @@ class Agent(AbsAgent):
                 BaseObject(sfunc=MA,func1=MA1),
                 BaseObject(sfunc=STREND,func1=STREND1),
             )
-
-        #策略   instrumentid ==> [(s1,stop1,maxvolume1),(s1,stop1,maxvolume2)]
-        self.strategy = dict(my_strategy)
-        #最大持仓手数 instrumentid ==> v
-        self.vlimit = dict(my_max_volume)
 
         #初始化
         self.prepare_data_env()
@@ -589,9 +632,10 @@ class Agent(AbsAgent):
         ##必须先把持仓初始化成配置值或者0
         self.qry_commands.append(self.fetch_trading_account)
         for inst in self.instruments:
-            self.position[inst] = BaseObject(instrument_id = inst,clong=0,cshort=0,hlong=0,hshort=0)
+            self.qry_commands.append(fcustom(self.fetch_instrument,instrument_id = inst))
             self.qry_commands.append(fcustom(self.fetch_instrument_marginrate,instrument_id = inst))
             self.qry_commands.append(fcustom(self.fetch_investor_position,instrument_id = inst))
+        time.sleep(1)   #保险起见
         self.check_qry_commands()
         self.initialized = True #避免因为断开后自动重连造成的重复访问
 
@@ -606,10 +650,11 @@ class Agent(AbsAgent):
         '''
             准备数据环境, 如需要的30分钟数据
         '''
-        self.data.update(hreader.prepare_data(self.instruments))
-        for dinst in self.data.values():
+        hdatas = hreader.prepare_data([name for name in self.instruments])
+        for hdata in hdatas.values():
+            self.instruments[hdata.name].data = hdata
             for dfo in self.data_funcs:
-                dfo.sfunc(dinst)
+                dfo.sfunc(hdata)
             
     def register_data_funcs(self,*funcss):
         for funcs in funcss:
@@ -648,6 +693,14 @@ class Agent(AbsAgent):
         r = self.trader.ReqQryInstrumentMarginRate(req,self.inc_request_id())
         print u'查询保证金率, 函数发出返回值:%s' % r
 
+    def fetch_instrument(self,instrument_id):
+        req = ustruct.QryInstrument(
+                        InstrumentID=instrument_id,
+                )
+        r = self.trader.ReqQryInstrument(req,self.inc_request_id())
+        print u'查询合约, 函数发出返回值:%s' % r
+
+
     ##交易处理
     def RtnTick(self,ctick):#行情处理主循环
         #print u'in my lock, close长度:%s,ma_5长度:%s\n' %(len(self.data[ctick.instrument].sclose),len(self.data[ctick.instrument].ma_5))
@@ -655,15 +708,18 @@ class Agent(AbsAgent):
         self.prepare_tick(ctick)
         #先平仓
         close_positions = self.check_close_signal()
-        self.make_trade(close_positions)
+        if len(close_positions)>0:
+            self.make_trade(close_positions)
         #再开仓.
         open_signals = self.check_signal(ctick)
-        open_positions = self.calc_position(open_signals)
-        self.make_trade(open_positions)
+        if len(open_signals) > 0:
+            open_positions = self.calc_position(inst,open_signals)
+            self.make_trade(open_positions)
         #撤单, 撤销3分钟内未成交的以及等待发出队列中30秒内未发出的单子
         self.cancel_orders()
-        #检查待发出单
-        self.check_queued()
+        #检查待发出命令
+        #self.check_queued()
+        self.check_commands()
         ##扫尾
         self.finalize()
         #print u'after my lock, close长度:%s,ma_5长度:%s\n' %(len(self.data[ctick.instrument].sclose),len(self.data[ctick.instrument].ma_5))
@@ -675,7 +731,7 @@ class Agent(AbsAgent):
         inst = ctick.instrument
         if inst not in self.data:
             logger.info(u'接收到未订阅的合约数据:%s' % (inst,))
-        dinst = self.data[inst]
+        dinst = self.instruments[inst].data
         if(self.prepare_base(dinst,ctick)):  #如果切分分钟则返回>0
             for func in self.data_funcs:    #动态计算
                 func.func1(dinst)
@@ -757,27 +813,54 @@ class Agent(AbsAgent):
 
     def check_signal(self,ctick):
         '''
-            检查开仓信号并发出指令
+            检查开仓信号返回信号集合[s1,s2,....]
+            其中每个元素包含以下属性:
+                合约号
+                开仓方向
+                开仓策略
+                平仓函数
+                最大手数
+                基准价
         '''
-        if ctick.instrument not in self.strategy:
-            return
-        if ctick.instrument not in self.data:
+        if ctick.instrument not in self.instruments:
             self.logger.warning(u'需要监控的%s未记录行情数据')
             print u'需要监控的%s未记录行情数据'
-        return []
+        signals = []
+        cur_inst = self.instruments[ctick.instrument]
+        for ss in cur_inst.strategy.values():
+            mysignal = ss.opener(self.data[ctick.instrument],ctick)
+            if mysignal[0] != 0:
+                base_price = mysignal[1] if mysignal[1]>0 else ctick.price
+                signals.append(BaseObject(instrument=cur_inst,direction=ss.direction,strategy=ss,open_volume=ss.open_volume,max_holding=ss.max_holding,base_price=base_price))
+        return signals
 
     def cancel_orders(self):
         pass
 
-    def check_queued(self):
-        pass
-
-    def calc_position(self,signals):
+    def calc_position(self,instrument,signals):
         '''
             根据信号集合来确定仓位
-            signal的结构为(合约号、开/平、策略集id、开平比例)
+            instrument: 合约对象
         '''
-        return []
+        positions = []
+        my_position = instrument.position_detail
+        for signal in signals:
+            cur_position = 0 if signal.strategy.name not in my_position else my_position[signal.strategy.name].volume
+            max_open = signal.max_holding - cur_position
+            if max_open <= 0:   #已经超过允许开仓数
+                continue
+            want_volume = signal.open_volume if  max_open >= signal.open_volume else max_open
+            margin_amount = instrument.margin_amount()
+            if margin_amount <= 1:
+                self.logger.error(u'合约%s保证金率未初始化' % (instrument.name))
+            available_volume = int(self.available / margin_amount)
+            if want_volume > availabel_volume:
+                want_volume = availabel_volume
+            signal.open_volume = want_volume
+            self.available -= (want_volume *margin_amount)
+            positions.append(signal)
+        return positions
+
 
     def make_trade(self,positions):
         '''
@@ -860,7 +943,6 @@ class Agent(AbsAgent):
 
 
     def finalize(self):
-        #记录分钟数据??
         pass
 
     def resume(self):
@@ -913,26 +995,27 @@ class Agent(AbsAgent):
         '''
         #print u'agent 持仓:',str(position)
         if position != None:    
+            cur_position = self.instruments[position.InstrumentID].position
             if position.PosiDirection == utype.THOST_FTDC_PD_Long:
                 if position.PositionDate == utype.THOST_FTDC_PSD_Today:
-                    self.position[position.InstrumentID].clong = position.Position  #TodayPosition
+                    cur_position.clong = position.Position  #TodayPosition
                 else:
-                    self.position[position.InstrumentID].hlong = position.Position  #YdPosition
+                    cur_position.hlong = position.Position  #YdPosition
             else:#空头
                 if position.PositionDate == utype.THOST_FTDC_PSD_Today:
-                    self.position[position.InstrumentID].cshort = position.Position #TodayPosition
+                    cur_position.cshort = position.Position #TodayPosition
                 else:
-                    self.position[position.InstrumentID].hshort = position.Position #YdPosition
+                    cur_position.hshort = position.Position #YdPosition
         else:#无持仓信息，保持默认设置
             pass
         self.check_qry_commands() 
 
     def rsp_qry_instrument_marginrate(self,marginRate):
         '''
-            查询保证金率回报
+            查询保证金率回报. 
         '''
-        self.marginrate[marginRate.InstrumentID] = (marginRate.LongMarginRatioByMoney,marginRate.ShortMarginRatioByMoney)
-        print str(marginRate)
+        self.instruments[marginRate.InstrumentID].marginrate = (marginRate.LongMarginRatioByMoney,marginRate.ShortMarginRatioByMoney)
+        #print str(marginRate)
         self.check_qry_commands()
 
     def rsp_qry_trading_account(self,account):
@@ -942,10 +1025,16 @@ class Agent(AbsAgent):
         self.available = account.Available
         self.check_qry_commands()        
     
-    def rsp_qry_instrument(self):
+    def rsp_qry_instrument(self,pinstrument):
         '''
-            暂时忽略
+            获得合约数量乘数. 
+            这里的保证金率应该是和期货公司无关，所以不能使用
         '''
+        if pinstrument.InstrumentID not in self.instruments:
+            self.logger.warning(u'收到未监控的合约查询:%s' % (pinstrument.InstrumentID))
+            return
+        self.instruments[pinstrument.InstrumentID].multiple = pinstrument.VolumeMultiple
+        self.instruments[pinstrument.InstrumentID].tick_base = pinstrument.PriceTick
         self.check_qry_commands()
 
     def rsp_qry_position_detail(self,position_detail):
@@ -999,7 +1088,7 @@ def user_main():
     cuser_wt1= c.GD_USER_2  #网通
     cuser_wt2= c.GD_USER_4  #网通
 
-    my_agent = Agent(None,None,INSTS,{},{})
+    my_agent = Agent(None,None,INSTS,{})
 
     make_user(my_agent,cuser0,'data1')
     #make_user(my_agent,cuser2,'data2')    
@@ -1030,8 +1119,8 @@ trader.RegisterSpi(None)
     trader = TraderApi.CreateTraderApi("trader")
     #cuser = c.SQ_TRADER1
     cuser = c.SQ_TRADER2
-    my_agent = Agent(trader,cuser,INSTS,{},{})
-    myspi = TraderSpiDelegate(instruments=INSTS, 
+    my_agent = Agent(trader,cuser,INSTS,{})
+    myspi = TraderSpiDelegate(instruments=my_agent.instruments, 
                              broker_id=cuser.broker_id,
                              investor_id= cuser.investor_id,
                              passwd= cuser.passwd,
@@ -1056,9 +1145,10 @@ myagent.spi.OnErrRtnOrderAction(agent.BaseObject(OrderRef='12',InstrumentID='IF1
 
 #资金和持仓
 myagent.fetch_trading_account()
-myagent.fetch_investor_position(u'IF1103')
-myagent.fetch_instrument_marginrate(u'IF1103')
-#myagent.fetch_investor_position_detail(u'IF1103')
+myagent.fetch_investor_position(u'IF1104')
+myagent.fetch_instrument_marginrate(u'IF1104')
+myagent.fetch_instrument(u'IF1104')
+#myagent.fetch_investor_position_detail(u'IF1104')
 
 
 #测试报单

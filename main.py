@@ -5,17 +5,14 @@
     以后考虑把MAX_VOLUME和STRATEGY配置移到配置文件中
 '''
 
+from base import *
 from strategy import *
 
-####配置
-#每个合约的最大持仓量
-MAX_VOLUME = {
-        'IF1103':1,
-        }
+#设定合约的策略
 
-#每个合约所应用的策略(策略名，止损函数, 开仓数)
+#[总最大持仓量,(策略名1，止损函数, 开仓方向，当次开仓数，最大持仓数),(策略名2，止损函数, 开仓方向,当次开仓数，最大持仓数)...]
 STRATEGY = {
-        'IF1103':[(ubreak,ufstop,1),(dbreak,dfstop,1)]
+        'IF1103':[1,(ubreak,ufstop,LONG,1,1),(dbreak,dfstop,SHORT,1,1)]
         }
 
 

@@ -127,7 +127,7 @@ def prepare_data(instruments,path=DATA_PATH):
         if inst[:2] == 'IF' or inst[:2] == 'if':
             PREPARER = IF_PREPARER
         else:
-            break   #目前未实现
+            PREPARER = CM_PREPARER
         tdata = read_history(inst,path)
         tdata.m1 = tdata.transaction
         ###基本序列按1分钟设定,方便快捷查找
