@@ -210,6 +210,7 @@ class MdSpiDelegate(MdSpi):
             rev.ask_price = int(market_data.AskPrice1*10+0.1)
             rev.ask_volume = market_data.AskVolume1
             rev.date = int(market_data.TradingDay)
+            rev.time = rev.date%10000 * 10000+ rev.min1*100 + rev.sec
         except Exception,inst:
             self.logger.warning(u'行情数据转换错误:%s' % str(inst))
         return rev
@@ -445,6 +446,7 @@ class TraderSpiDelegate(TraderSpi):
             CTP、交易所接受报单
             Agent中不区分，所得信息只用于撤单
         '''
+        #print repr(pOrder)
         self.logger.info(u'报单响应,Order=%s' % str(pOrder))
         if pOrder.OrderStatus == 'a':
             #CTP接受，但未发到交易所
@@ -480,21 +482,21 @@ class TraderSpiDelegate(TraderSpi):
         self.agent.err_order_action(pOrderAction.OrderRef,pOrderAction.InstrumentID,pRspInfo.ErrorID,pRspInfo.ErrorMsg)
 
 
-SLIPPAGE_RESERVE = 0.01 #1%的滑点计差, 用于估算开仓量
 class c_instrument(object):
     @staticmethod
     def create_instruments(names,strategy):
         '''根据名称序列和策略序列创建instrument
            其中策略序列的结构为:
-           [总最大持仓量,(策略名1，止损函数, 当次开仓数，最大持仓数),(策略名2，止损函数, 当次开仓数，最大持仓数)...] 
+           [总最大持仓量,策略1,策略2...] 
         '''
         objs = dict([(name,c_instrument(name)) for name in names])
         for name,item in strategy:
             if name not in objs:
-                print u'合约%s不在盯盘列表中' % (name,)
+                print u'策略针对合约%s不在盯盘列表中' % (name,)
                 continue
             objs[name].max_volume = item[0]
-            objs[name].strategy = dict([(u'%s-%s' % (func_name(ss[0]),func_name(ss[1])),BaseObject(name=u'%s-%s' % (func_name(ss[0]),func_name(ss[1])),opener=ss[0],stoper=ss[1],direction=ss[2],open_volume=ss[3],max_holding=ss[4])) for ss in item[1:]])   #策略以开仓方法+平仓方法为名
+            objs[name].strategy = dict([(ss.get_name(),ss) for ss in item[1:]])
+            objs[name].initialize_positions()
         return objs
 
     def __init__(self,name):
@@ -504,12 +506,12 @@ class c_instrument(object):
         #合约乘数
         self.multiple = 0
         #最小跳动
-        self.tick_base = 0
+        self.tick_base = 0  #单位为0.1
         #持仓量
         #BaseObject(hlong,hshort,clong,cshort) #历史多、历史空、今日多、今日空 #必须与实际数据一致, 实际上没用到
         self.position = BaseObject(hlong=0,hshort=0,clong=0,cshort=0)
-        #持仓明细策略==>(合约、策略、基准价、基准时间、request_id、持仓量、当前止损价)
-        self.position_detail = {}   #需要在Agent的resume中恢复
+        #持仓明细策略名==>(合约、策略名、策略、基准价、基准时间、orderref、持仓方向、持仓量、当前止损价)
+        self.position_detail = {}   #在Agent的ontrade中设定, 并需要在resume中恢复
         #设定的最大持仓手数
         self.max_volume = 1
 
@@ -522,9 +524,25 @@ class c_instrument(object):
         #   tdata.cur_day是当日的行情，包括开盘,最高,最低,当前价格,持仓,累计成交量, 其中最高/最低有两类，一者是tick的当前价集合得到的，一者是tick中的最高/最低价得到的
         self.data = BaseObject()
 
-    def margin_amount(self,price,direction):   #所有price以0.1为基准
+    def initialize_positions(self): #根据策略初始化头寸为0
+        self.position_detail = dict([(ss.get_name,Position(self.name,ss)) for ss in self.strategy.values()])
+
+    def calc_margin_amount(self,price,direction):   
+        '''
+            计算保证金
+            所有price以0.1为基准
+            返回的保证金以1为单位
+        '''
         my_marginrate = self.marginrate[0] if direction == LONG else self.marginrate[1]
-        return price / 10.0 * self.multiple * my_marginrate * (1+SLIPPAGE_RESERVE)
+        return price / 10.0 * self.multiple * my_marginrate 
+
+    def make_target_price(self,price,direction): 
+        '''
+            计算开平仓时的溢出价位
+            传入的price以0.1为单位
+            返回的目标价以1为单位
+        '''
+        return (price + SLIPPAGE_BASE * self.tick_base if direction == LONG else price-SLIPPAGE_BASE * self.tick_base)/10.0
 
 
 class AbsAgent(object):
@@ -538,6 +556,9 @@ class AbsAgent(object):
     def inc_tick(self):
         self.tick += 1
         self.check_commands()
+        return self.tick
+
+    def get_tick(self):
         return self.tick
 
     def put_command(self,trigger_tick,command): #按顺序插入
@@ -579,7 +600,7 @@ class Agent(AbsAgent):
                               #顺序关系非常重要，否则可能会紊乱
         ###交易
         self.lastupdate = 0
-        self.transited_orders = []    #发出后等待回报的指令, 回报后到holding
+        self.transmitting_orders = {}    #orderref==>order,发出后等待回报的指令, 回报后到holding
         #self.queued_orders = []     #因为保证金原因等待发出的指令(合约、策略族、基准价、基准时间(到秒))
         self.front_id = None
         self.session_id = None
@@ -645,6 +666,8 @@ class Agent(AbsAgent):
             time.sleep(1)   #这个只用于非行情期的执行. 
             self.qry_commands[0]()
             del self.qry_commands[0]
+        print u'查询命令序列长度:',len(self.qry_commands)
+
 
     def prepare_data_env(self):
         '''
@@ -703,33 +726,29 @@ class Agent(AbsAgent):
 
     ##交易处理
     def RtnTick(self,ctick):#行情处理主循环
-        #print u'in my lock, close长度:%s,ma_5长度:%s\n' %(len(self.data[ctick.instrument].sclose),len(self.data[ctick.instrument].ma_5))
+        #print u'in my lock, close长度:%s,ma_5长度:%s\n' %(len(self.instrument[ctick.instrument].data.sclose),len(self.instrument[ctick.instrument].data.ma_5))
         inst = ctick.instrument
         self.prepare_tick(ctick)
         #先平仓
-        close_positions = self.check_close_signal()
+        close_positions = self.check_close_signal(ctick)
         if len(close_positions)>0:
-            self.make_trade(close_positions)
+            self.make_command(close_positions)
         #再开仓.
-        open_signals = self.check_signal(ctick)
+        open_signals = self.check_open_signal(ctick)
         if len(open_signals) > 0:
-            open_positions = self.calc_position(inst,open_signals)
-            self.make_trade(open_positions)
-        #撤单, 撤销3分钟内未成交的以及等待发出队列中30秒内未发出的单子
-        self.cancel_orders()
+            self.make_command(open_signals)
         #检查待发出命令
-        #self.check_queued()
         self.check_commands()
         ##扫尾
         self.finalize()
-        #print u'after my lock, close长度:%s,ma_5长度:%s\n' %(len(self.data[ctick.instrument].sclose),len(self.data[ctick.instrument].ma_5))
+        #print u'after my lock, close长度:%s,ma_5长度:%s\n' %(len(self.instrument[ctick.instrument].data.sclose),len(self.instrument[ctick.instrument].data.ma_5))
         
     def prepare_tick(self,ctick):
         '''
             准备计算, 包括分钟数据、指标的计算
         '''
         inst = ctick.instrument
-        if inst not in self.data:
+        if inst not in self.instrument:
             logger.info(u'接收到未订阅的合约数据:%s' % (inst,))
         dinst = self.instruments[inst].data
         if(self.prepare_base(dinst,ctick)):  #如果切分分钟则返回>0
@@ -805,13 +824,36 @@ class Agent(AbsAgent):
         dinst.cur_day.vclose = ctick.price
         return rev
         
-    def check_close_signal(self):
+    def check_close_signal(self,ctick):
         '''
             检查平仓信号
+            #TODO: 必须考虑出现平仓信号时，position还没完全成交的情况
+                   在OnTrade中进行position的细致处理 
         '''
-        return []
+        signals = []
+        if ctick.instrument not in self.instruments:
+            self.logger.warning(u'需要监控的%s未记录行情数据')
+            print u'需要监控的%s未记录行情数据'
+            return signals
+        cur_inst = self.instruments[ctick.instrument]
+        for position in cur_inst.position_detail.values():
+            for order in position.orders:
+                if order.opened_volume > 0:
+                    mysignal = order.stoper.check(cur_inst.data,ctick)
+                    if mysignal[0] != 0:    #止损
+                        signals.append(BaseObject(instrument=cur_inst,
+                                volume=order.opened_volume,
+                                direction = order.stoper.direction,
+                                base_price = mysignal[1],
+                                price=order.stoper.calc_target_price(mysignal[1],cur_inst.tick_base),
+                                source_order = order, #原始头寸
+                                mytime = ctick.time,
+                                action_type = XCLOSE,
+                            )
+                        )
+        return signals
 
-    def check_signal(self,ctick):
+    def check_open_signal(self,ctick):
         '''
             检查开仓信号返回信号集合[s1,s2,....]
             其中每个元素包含以下属性:
@@ -822,54 +864,73 @@ class Agent(AbsAgent):
                 最大手数
                 基准价
         '''
+        signals = []
         if ctick.instrument not in self.instruments:
             self.logger.warning(u'需要监控的%s未记录行情数据')
             print u'需要监控的%s未记录行情数据'
-        signals = []
+            return signals
         cur_inst = self.instruments[ctick.instrument]
         for ss in cur_inst.strategy.values():
-            mysignal = ss.opener(self.data[ctick.instrument],ctick)
+            mysignal = ss.opener(cur_inst.data,ctick)
             if mysignal[0] != 0:
                 base_price = mysignal[1] if mysignal[1]>0 else ctick.price
-                signals.append(BaseObject(instrument=cur_inst,direction=ss.direction,strategy=ss,open_volume=ss.open_volume,max_holding=ss.max_holding,base_price=base_price))
+                candidate = Order(instrument=cur_inst,
+                                position=cur_inst.position_details[ss.name],
+                                base_price=base_price,
+                                target_price=strategy.opener.calc_target_price(base_price,cur_inst.tick_base),
+                                mytime = ctike.time,
+                                action_type=XOPEN,
+                            )
+                candidate.volume = self.calc_open_volume(instrument,order)
+                if candidate.volume > 0:
+                    self.available -= (want_volume *margin_amount)  #锁定保证金
+                    signals.append(candidate)
         return signals
 
-    def cancel_orders(self):
-        pass
-
-    def calc_position(self,instrument,signals):
+    def calc_open_volume(self,instrument,order):
         '''
-            根据信号集合来确定仓位
+            计算order的可开仓数
             instrument: 合约对象
         '''
-        positions = []
-        my_position = instrument.position_detail
-        for signal in signals:
-            cur_position = 0 if signal.strategy.name not in my_position else my_position[signal.strategy.name].volume
-            max_open = signal.max_holding - cur_position
-            if max_open <= 0:   #已经超过允许开仓数
-                continue
-            want_volume = signal.open_volume if  max_open >= signal.open_volume else max_open
-            margin_amount = instrument.margin_amount()
-            if margin_amount <= 1:
-                self.logger.error(u'合约%s保证金率未初始化' % (instrument.name))
-            available_volume = int(self.available / margin_amount)
-            if want_volume > availabel_volume:
-                want_volume = availabel_volume
-            signal.open_volume = want_volume
-            self.available -= (want_volume *margin_amount)
-            positions.append(signal)
-        return positions
+        want_volume = order.position.calc_remained_volume()
+        if want_volume <= 0:
+            return 0
+        margin_amount = instrument.calc_margin_amount(order.target_price,order.strategy.direction)
+        if margin_amount <= 1:#不可能只有1块钱
+            self.logger.error(u'合约%s保证金率未初始化' % (instrument.name,))
+            print u'合约%s保证金率未初始化' % (instrument.name,)
+        available_volume = int(self.available / margin_amount)
+        if available_volume == 0:
+            return 0
+        if want_volume > availabel_volume:
+            want_volume = availabel_volume
+        return want_volume
 
-
-    def make_trade(self,positions):
+    def make_command(self,orders):
         '''
-            根据仓位指令进行交易
-            position的结构为(合约号、开/平、策略集id、开平手数)
-            必须处理同时发出开平仓指令时保证金不足引起的问题，此时，应该放入到队列中, 并在每次平仓后检查这个队列中是否满足保证金
-                这类指令必须在指定时间内(如30秒)实现，否则废弃
+            根据下单指令进行开/平仓
+            开仓时,埋入一分钟后的撤单指令
+            TODO: 平仓时考虑直接用市价单
         '''
-        pass
+        for order in orders:
+            order.order_ref = self.inc_order_ref()
+            command = BaseObject(instrument = order.instrument.name,
+                    direction = order.direction,
+                    price = order.target_price/10.0, #内部都是以0.1为计量单位
+                    volume = order.volume,
+                    order_ref = order.order_ref,
+                    action_type = order.action_type,
+                )
+            if order.action_type == XOPEN:##开仓情况,X跳后不论是否成功均撤单
+                self.transmitting_orders[command.order_ref] = order
+                ##初始化止损类
+                order.stoper = order.position.strategy.stoper(order.instrument.data,order.base_price)
+                self.put_command(self.get_tick()+order.position.strategy.opener.valid_length,fcustom(self.cancel_command,command=command))
+                self.open_position(command)
+            else:#平仓, Y跳后不论是否成功均撤单, 撤单应该比开仓更快，避免追不上
+                self.transmitting_orders[command.order_ref] = order.source_order
+                self.put_command(self.get_tick()+position.stoper.valid_length,fcustom(self.cancel_command,command=command))
+                self.close_position(command)
 
     def open_position(self,order):
         ''' 
@@ -879,7 +940,7 @@ class Agent(AbsAgent):
                 InstrumentID = order.instrument,
                 Direction = order.direction,
                 OrderRef = str(order.order_ref),
-                LimitPrice = order.price,
+                LimitPrice = order.price,   #有个疑问，double类型如何保证舍入舍出，在服务器端取整?
                 VolumeTotalOriginal = order.volume,
                 OrderPriceType = utype.THOST_FTDC_OPT_LimitPrice,
                 
@@ -916,7 +977,7 @@ class Agent(AbsAgent):
                 CombHedgeFlag = utype.THOST_FTDC_HF_Speculation,   #投机 5位字符,但是只用到第0位
 
                 VolumeCondition = utype.THOST_FTDC_VC_AV,
-                MinVolume = 1,  #这个有点不确定
+                MinVolume = 1,  #TODO:这个有点不确定. 需要测试确认
                 ForceCloseReason = utype.THOST_FTDC_FCC_NotForceClose,
                 IsAutoSuspend = 1,
                 UserForceClose = 0,
@@ -924,20 +985,20 @@ class Agent(AbsAgent):
             )
         r = self.trader.ReqOrderInsert(req,self.inc_request_id())
 
-    def cancel_order(self,order):
+    def cancel_command(self,command):
         '''
             发出撤单指令
         '''
         req = ustruct.InputOrderAction(
-                InstrumentID = order.instrument,
-                OrderRef = str(order.order_ref),
+                InstrumentID = command.instrument,
+                OrderRef = str(command.order_ref),
                 
                 BrokerID = self.cuser.broker_id,
                 InvestorID = self.cuser.investor_id,
                 FrontID = self.front_id,
                 SessionID = self.session_id,
                 ActionFlag = utype.THOST_FTDC_AF_Delete,
-                #OrderActionRef = self.inc_order_ref()  #没用
+                #OrderActionRef = self.inc_order_ref()  #没用,不关心这个，每次撤单成功都需要去查资金
             )
         r = self.trader.ReqOrderAction(req,self.inc_request_id())
 
@@ -963,16 +1024,31 @@ class Agent(AbsAgent):
     def rtn_trade(self,strade):
         '''
             成交回报
-            必须处理策略分类持仓汇总和持仓总数不匹配时的问题
+            #TODO: 必须考虑出现平仓信号时，position还没完全成交的情况
+                   在OnTrade中进行position的细致处理 
+            #TODO: 必须处理策略分类持仓汇总和持仓总数不匹配时的问题
         '''
-        pass    #需要处理分类持仓
+        if strade.OrderRef not in self.transmitting_orders or strade.InstrumentID not in self.instruments:
+            self.logger.warning(u'收到非本程序发出的成交回报:%s-%s' % (strade.InstrumentID,strade.OrderRef))
+        cur_inst = self.instruments[strade.InstrumentID]
+        myorder = self.transmitting_orders[int(strade.OrderRef)]
+        if myorder.action_type == XOPEN:#开仓, 也可用pTrade.OffsetFlag判断
+            myorder.on_trade(price=int(strade.Price*10+0.1),volume=strade.Volume,trade_time=strade.TradeTime)
+        else:
+            myorder.source_order.on_close(price=int(strade.Price*10+0.1),volume=strade.Volume,trade_time=strade.TradeTime)
+        ##查询可用资金
+        self.put_command(self.get_tick()+1,self.fetch_trading_account)
+
 
     def rtn_order(self,sorder):
         '''
-            ctp/交易所接受下单/撤单回报,不区分ctp和交易所
-            暂时忽略
+            交易所接受下单回报(CTP接受的已经被过滤)
+            暂时只处理撤单的回报. 
         '''
-        pass
+        #print str(sorder)
+        if sorder.OrderStatus == utype.THOST_FTDC_OST_Canceled or sorder.OrderStatus == utype.THOST_FTDC_OST_PartTradedNotQueueing:   #完整撤单或部成部撤
+            ##查询可用资金
+            self.put_command(self.get_tick()+1,self.fetch_trading_account)
 
     def err_order_insert(self,order_ref,instrument_id,error_id,error_msg):
         '''
@@ -1034,7 +1110,7 @@ class Agent(AbsAgent):
             self.logger.warning(u'收到未监控的合约查询:%s' % (pinstrument.InstrumentID))
             return
         self.instruments[pinstrument.InstrumentID].multiple = pinstrument.VolumeMultiple
-        self.instruments[pinstrument.InstrumentID].tick_base = pinstrument.PriceTick
+        self.instruments[pinstrument.InstrumentID].tick_base = int(pinstrument.PriceTick * 10 + 0.1)
         self.check_qry_commands()
 
     def rsp_qry_position_detail(self,position_detail):
@@ -1165,11 +1241,11 @@ import agent
 trader,myagent = agent.trade_test_main()
 
 cref = myagent.inc_order_ref()
-morder = agent.BaseObject(instrument='IF1103',direction='0',order_ref=cref,price=3180,volume=1)
+morder = agent.BaseObject(instrument='IF1104',direction='0',order_ref=cref,price=3180,volume=1)
 myagent.open_position(morder)
 
 rorder = agent.BaseObject(instrument='IF1103',order_ref=cref)
-myagent.cancel_order(rorder)
+myagent.cancel_command(rorder)
 
 
 '''
