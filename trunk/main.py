@@ -10,11 +10,19 @@ from strategy import *
 
 #设定合约的策略
 
-#[总最大持仓量,(策略名1，止损函数, 开仓方向，当次开仓数，最大持仓数),(策略名2，止损函数, 开仓方向,当次开仓数，最大持仓数)...]
+#[总最大持仓量,策略1,策略2...]
 STRATEGY = {
-        'IF1103':[1,(ubreak,ufstop,LONG,1,1),(dbreak,dfstop,SHORT,1,1)]
+        'IF1104':(  1,#总最大持仓量=1
+                    STRATEGY(opener=day_long_break,
+                            closer=datr_long_stoper,
+                            open_volume=1,
+                            max_holding=1),
+                    STRATEGY(opener=day_short_break,
+                            closer=datr_short_stoper,
+                            open_volume=1,
+                            max_holding=1),
+                )
         }
-
 
 #####
 import agent

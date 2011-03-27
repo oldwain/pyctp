@@ -2,11 +2,17 @@
 
 IDATE,ITIME,IOPEN,ICLOSE,IHIGH,ILOW,IVOL,IHOLDING = 0,1,2,3,4,5,6,7
 
+#多空标志
 LONG,SHORT,EMPTY = -1,1,0   #多仓出钱,淡仓收钱
+#开平仓的标志
+XOPEN,XCLOSE = -1,1 #开仓,平仓
 
 
 import sys
 from functools import partial
+
+def inverse_direction(direction):
+    return LONG if direction == SHORT else SHORT
 
 def fcustom(func,**kwargs):
     ''' 根据kwargs设置func的偏函数,并将此偏函数的名字设定为源函数名+所固定的关键字参数名
