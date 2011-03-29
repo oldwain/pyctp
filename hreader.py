@@ -12,14 +12,6 @@ logger = logging.getLogger('ctp.hreader')
 DATA_PATH = 'data/'
 
 
-def make_tick_filename(instrument,tday=0,suffix='txt'):
-    if tday == 0:
-        tday = time.strftime('%Y%m%d')
-    return '%s%s_%s_tick.%s' % (DATA_PATH,instrument,tday,suffix)
-
-def make_min_filename(instrument,suffix='txt'):
-    return '%s%s_%s_min.%s' % (DATA_PATH,instrument,time.strftime('%Y%m%d'),suffix)
-
 #################################################################
 ## 历史数据读取
 #################################################################
@@ -85,20 +77,47 @@ def read_min_as_list(filename,length,extractor=extract_std,readfunc = read_data)
             i += 1
     return tran_data
 
+def concatenate(*args):
+    result =  [[],[],[],[],[],[],[],[]]
+    for arg in args:
+        for i in range(8):
+            result[i] += arg[i]
+    return result
+
+import os
+def prepare_directory(instruments):#确认若不存在子目录，则创建之
+    for instrument in instruments:
+        directory = '%s%s' % (DATA_PATH,instrument)
+        if not os.path.exists(directory):
+            os.mkdir(directory)
+    
+
 
 prefix = ''
 SUFFIX = '.txt'
 SUFFIX_ZIP = '.zip'
+HISTORY_TXT = 'history.txt'
 
-make_his_filename = lambda path,prefix,name,suffix:path + prefix + name + suffix
+def make_tick_filename(instrument,tday=0,suffix='txt'):
+    if tday == 0:
+        tday = time.strftime('%Y%m%d')
+    return '%s%s/%s_tick.%s' % (DATA_PATH,instrument,tday,suffix)
 
-def read1(instrument,length=6000,path=DATA_PATH,extractor=extract_std,readfunc=read_data,suffix=SUFFIX):
+def make_min_filename(instrument,suffix='txt'):
+    return '%s%s/%s_min.%s' % (DATA_PATH,instrument,time.strftime('%Y%m%d'),suffix)
+
+
+make_his_filename = lambda path,name:'%s%s/%s' % (path,name,HISTORY_TXT)
+
+def read1(instrument,length=6000,path=DATA_PATH,extractor=extract_std,readfunc=read_data):
     #6000是22天，足够应付日ATR计算
-    hdata = BaseObject(name=instrument,instrument=instrument,transaction=read_min_as_list(make_his_filename(path,prefix,instrument,suffix),length=length,extractor=extractor,readfunc=readfunc))
+    dhistory = read_min_as_list(make_his_filename(path,instrument),length=length,extractor=extractor,readfunc=readfunc)
+    dtoday = read_min_as_list(make_min_filename(path,instrument),length=length,extractor=extractor,readfunc=readfunc)
+    hdata = BaseObject(name=instrument,instrument=instrument,transaction=concatenate(dhistory+dtoday))
     return hdata
 
 #不从zip读数据
-#read1_zip = fcustom(read1,readfunc=read_data_zip,suffix=SUFFIX_ZIP)
+#read1_zip = fcustom(read1,readfunc=read_data_zip)
 
 
 def read_history(instrument_id,path):

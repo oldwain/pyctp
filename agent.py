@@ -147,7 +147,7 @@ class MdSpiDelegate(MdSpi):
             self.subscribe_market_data(self.instruments)
 
     def subscribe_market_data(self, instruments):
-        self.api.SubscribeMarketData(instruments)
+        self.api.SubscribeMarketData(list(instruments))
 
     def OnRtnDepthMarketData(self, depth_market_data):
         #print depth_market_data.BidPrice1,depth_market_data.BidVolume1,depth_market_data.AskPrice1,depth_market_data.AskVolume1,depth_market_data.LastPrice,depth_market_data.Volume,depth_market_data.UpdateTime,depth_market_data.UpdateMillisec,depth_market_data.InstrumentID
@@ -621,6 +621,7 @@ class Agent(AbsAgent):
             )
 
         #初始化
+        hreader.prepare_directory(instruments)
         self.prepare_data_env()
 
 
@@ -748,7 +749,7 @@ class Agent(AbsAgent):
             准备计算, 包括分钟数据、指标的计算
         '''
         inst = ctick.instrument
-        if inst not in self.instrument:
+        if inst not in self.instruments:
             logger.info(u'接收到未订阅的合约数据:%s' % (inst,))
         dinst = self.instruments[inst].data
         if(self.prepare_base(dinst,ctick)):  #如果切分分钟则返回>0
@@ -1136,10 +1137,20 @@ class Agent(AbsAgent):
         self.check_qry_commands()
 
 
+class SaveAgent(Agent):
+    def RtnTick(self,ctick):#行情处理主循环
+        inst = ctick.instrument
+        if inst not in self.instruments:
+            logger.info(u'接收到未订阅的合约数据:%s' % (inst,))
+        dinst = self.instruments[inst].data
+        self.prepare_base(dinst,ctick)  
+
+
 import config as c 
 
 def make_user(my_agent,hq_user,name='data'):
     user = MdApi.CreateMdApi(name)
+    #print my_agent.instruments
     user.RegisterSpi(MdSpiDelegate(instruments=my_agent.instruments, 
                              broker_id=hq_user.broker_id,
                              investor_id= hq_user.investor_id,
@@ -1180,6 +1191,60 @@ def user_main():
 
     #while True:
     #    time.sleep(1)
+
+def save1():
+    logging.basicConfig(filename="ctp_user_agent.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
+    
+    cuser0 = c.SQ_USER
+    cuser1 = c.GD_USER
+    cuser2 = c.GD_USER_3
+    cuser_wt1= c.GD_USER_2  #网通
+    cuser_wt2= c.GD_USER_4  #网通
+
+    my_agent = SaveAgent(None,None,INSTS,{})
+
+    make_user(my_agent,cuser0,'data1')
+    #make_user(my_agent,cuser2,'data2')    
+    #make_user(my_agent,cuser_wt1,'data_wt1')
+    #make_user(my_agent,cuser_wt2,'data_wt2')    
+    
+    #make_user(my_agent,cuser0,'data')
+    #make_user(my_agent,cuser0,'data')
+    #make_user(my_agent,cuser0,'data')
+    #make_user(my_agent,cuser0,'data')
+    #make_user(my_agent,cuser0,'data')
+    #make_user(my_agent,cuser0,'data')
+
+    #while True:
+    #    time.sleep(1)
+
+
+def save2():
+    logging.basicConfig(filename="ctp_user_agent.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
+    
+    cuser0 = c.SQ_USER
+    cuser1 = c.GD_USER
+    cuser2 = c.GD_USER_3
+    cuser_wt1= c.GD_USER_2  #网通
+    cuser_wt2= c.GD_USER_4  #网通
+
+    my_agent = SaveAgent(None,None,INSTS,{})
+
+    #make_user(my_agent,cuser0,'data1')
+    make_user(my_agent,cuser2,'data2')    
+    make_user(my_agent,cuser_wt1,'data_wt1')
+    make_user(my_agent,cuser_wt2,'data_wt2')    
+    
+    #make_user(my_agent,cuser0,'data')
+    #make_user(my_agent,cuser0,'data')
+    #make_user(my_agent,cuser0,'data')
+    #make_user(my_agent,cuser0,'data')
+    #make_user(my_agent,cuser0,'data')
+    #make_user(my_agent,cuser0,'data')
+
+    #while True:
+    #    time.sleep(1)
+
 
 def trade_test_main():
     '''
