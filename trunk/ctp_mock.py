@@ -63,13 +63,27 @@ class MockMd(object):
     '''
     def __init__(self,instrument):
         self.instrument = instrument
-        self.agent = agent.Agent(None,None,[instrument],{},{})
+        self.agent = agent.Agent(None,None,[instrument],{})
 
     def play(self,tday=0):
         ticks = hreader.read_ticks(self.instrument,tday)
         for tick in ticks:
             self.agent.RtnTick(tick)
             #self.agent.RtnTick(tick)
+
+class SaveMock(object):
+    '''简单起见，只模拟一个合约，用于功能测试
+    '''
+    def __init__(self,instrument):
+        self.instrument = instrument
+        self.agent = agent.SaveAgent(None,None,[instrument],{})
+
+    def play(self,tday=0):
+        ticks = hreader.read_ticks(self.instrument,tday)
+        for tick in ticks:
+            self.agent.RtnTick(tick)
+            #self.agent.RtnTick(tick)
+
 
 import time
 import logging
@@ -93,6 +107,8 @@ class NULLAgent(object):
         self.order_ref = 1
         self.trading_day = 20110101
         self.scur_day = int(time.strftime('%Y%m%d'))
+
+        #hreader.prepare_directory(INSTS_SAVE)
 
     def set_spi(self,spi):
         self.spi = spi
@@ -124,6 +140,7 @@ from agent import MdApi,MdSpiDelegate,c,INSTS_SAVE
 
 def user_save1():
     logging.basicConfig(filename="ctp_user.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
+
 
     cuser0 = c.SQ_USER
     cuser1 = c.GD_USER
