@@ -1,5 +1,11 @@
 #-*- coding:utf-8 -*-
 '''
+20110406
+todo: 1. 确认在Agent的prepare_base中使用sleep不会阻碍下一个数据的接收
+      2. 完成当日的收盘作业
+      3. 设计中间保存的格式
+      4. 完成情景恢复
+
 Agent的目的是合并行情和交易API到一个类中进行处理
     把行情和交易分开，从技术角度上来看挺好，但从使用者角度看就有些蛋疼了.
     正常都是根据行情决策
@@ -32,9 +38,11 @@ acd_da_sz_b2
   不需要,可以忍受1s的延时. 因为行情通过别的来接收  
 '''
 
+import sched
 import time
 import logging
 import thread
+import threading
 import bisect
 
 from base import *
@@ -623,7 +631,8 @@ class Agent(AbsAgent):
         #初始化
         hreader.prepare_directory(instruments)
         self.prepare_data_env()
-
+        #调度器
+        self.scheduler = sched.scheduler(time.time, time.sleep)
 
     def set_spi(self,spi):
         self.spi = spi
@@ -756,7 +765,32 @@ class Agent(AbsAgent):
             for func in self.data_funcs:    #动态计算
                 func.func1(dinst)
 
-    def prepare_base(self,dinst,ctick):
+    def day_finalize(self,dinst,last_min,last_sec,save_flag=True):
+        '''指定dinst的日结操作
+           将当日数据复制到history.txt 
+        '''
+        #print dinst.name,last_min,last_sec
+        if dinst.cur_min.vtime > last_min:  #存在151500或150000,不需要继续转换
+            print u'%s存在151500或150000,dinst.cur_min=%s,last_min=%s' % (dinst.name,dinst.cur_min.vtime,last_min)
+            self.logger.info(u'%s存在151500或150000,dinst.cur_min=%s,last_min=%s' % (dinst.name,dinst.cur_min,last_min))
+        else:   #不存在151500或150000.则将最后一分钟保存
+            self.save_min(dinst,save_flag)
+        hreader.check_merge(dinst.name)
+
+    def save_min(self,dinst,save_flag=True):
+        dinst.sdate.append(dinst.cur_min.vdate)
+        dinst.stime.append(dinst.cur_min.vtime)
+        dinst.sopen.append(dinst.cur_min.vopen)
+        dinst.sclose.append(dinst.cur_min.vclose)
+        dinst.shigh.append(dinst.cur_min.vhigh)
+        dinst.slow.append(dinst.cur_min.vlow)
+        dinst.sholding.append(dinst.cur_min.vholding)
+        dinst.svolume.append(dinst.cur_min.vvolume)
+        ##需要save下
+        if save_flag == True:
+            hreader.save1(dinst.name,dinst.cur_min)
+
+    def prepare_base(self,dinst,ctick,save_flag=False):
         '''
             返回值标示是否是分钟的切换
             这里没有处理15:00:00的问题
@@ -767,7 +801,7 @@ class Agent(AbsAgent):
             #print ctick.min1,dinst.cur_min.vtime,ctick.date,dinst.cur_min.vdate
             if (len(dinst.stime)>0 and (ctick.date > dinst.sdate[-1] or ctick.min1 > dinst.stime[-1])) or len(dinst.stime)==0:#已有分钟与已保存的有差别
                 #这里把00秒归入到新的分钟里面
-                if (hreader.is_if(ctick.instrument) and ctick.min1 == 1515 and ctick.sec==0) or (not hreader.is_if(ctick.instrument) and ctick.min1 == 1500 and ctick.sec==0): #最后一秒钟算1514/1500的
+                if (hreader.is_if(ctick.instrument) and ctick.min1 == 1515 and ctick.sec==0) or (not hreader.is_if(ctick.instrument) and ctick.min1 == 1500 and ctick.sec==0): #最后一秒钟算1514/1500的, 需要处理没有1500/1515时候的最后一分钟
                     print u'最后一秒钟....'
                     dinst.cur_min.vclose = ctick.price
                     if ctick.price > dinst.cur_min.vhigh:
@@ -778,16 +812,7 @@ class Agent(AbsAgent):
                     dinst.cur_min.vvolume += (ctick.dvolume - dinst.cur_day.vvolume)
                 if dinst.cur_min.vdate != 0:    #不是史上第一个
                     print u'正常保存分钟数据.......'
-                    dinst.sdate.append(dinst.cur_min.vdate)
-                    dinst.stime.append(dinst.cur_min.vtime)
-                    dinst.sopen.append(dinst.cur_min.vopen)
-                    dinst.sclose.append(dinst.cur_min.vclose)
-                    dinst.shigh.append(dinst.cur_min.vhigh)
-                    dinst.slow.append(dinst.cur_min.vlow)
-                    dinst.sholding.append(dinst.cur_min.vholding)
-                    dinst.svolume.append(dinst.cur_min.vvolume)
-                    ##需要save下
-                    hreader.save1(dinst.name,dinst.cur_min)
+                    self.save_min(dinst,save_flag)
                 else:#是史上第一个，之前的cur_min是默认值
                     print u'不保存分钟数据,date=%s' % (dinst.cur_min.vdate)
                     rev = False
@@ -823,8 +848,12 @@ class Agent(AbsAgent):
         dinst.cur_day.vhighd = ctick.high   #服务器传过来的最大/最小
         dinst.cur_day.vlowd = ctick.low
         dinst.cur_day.vclose = ctick.price
+        if (hreader.is_if(ctick.instrument) and ctick.min1 == 1514 and ctick.sec==59) or (not hreader.is_if(ctick.instrument) and ctick.min1 == 1459 and ctick.sec==59): #
+            threading.Timer(30,self.day_finalize,args=[dinst,ctick.min1,ctick.sec,save_flag]).start()
+            self.day_finalize(dinst)
+        threading.Timer(3,self.day_finalize,args=[dinst,ctick.min1,ctick.sec,save_flag]).start()
         return rev
-        
+    
     def check_close_signal(self,ctick):
         '''
             检查平仓信号
@@ -1143,7 +1172,7 @@ class SaveAgent(Agent):
         if inst not in self.instruments:
             logger.info(u'接收到未订阅的合约数据:%s' % (inst,))
         dinst = self.instruments[inst].data
-        self.prepare_base(dinst,ctick)  
+        self.prepare_base(dinst,ctick,save_flag=True)  
 
 
 import config as c 
@@ -1231,8 +1260,8 @@ def save2():
     my_agent = SaveAgent(None,None,INSTS,{})
 
     #make_user(my_agent,cuser0,'data1')
-    make_user(my_agent,cuser2,'data2')    
-    make_user(my_agent,cuser_wt1,'data_wt1')
+    #make_user(my_agent,cuser2,'data2')    
+    #make_user(my_agent,cuser_wt1,'data_wt1')
     make_user(my_agent,cuser_wt2,'data_wt2')    
     
     #make_user(my_agent,cuser0,'data')
