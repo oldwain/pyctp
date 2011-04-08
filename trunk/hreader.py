@@ -77,6 +77,24 @@ def read_min_as_list(filename,length,extractor=extract_std,readfunc = read_data)
             i += 1
     return tran_data
 
+
+NULL_RECORD = BaseObject(date=0,time=0,open=0,close=0,high=0,low=0,vol=0,holding=0)
+def read_last_record(filename,extractor=extract_std,readfunc = read_data):
+    try:
+        records = readfunc(filename,extractor)
+    except Exception,inst:#读不到数据,默认都为1(避免出现被0除)
+        logger.error(u'文件打开错误，文件名=%s,错误信息=%s' % (filename,str(inst)))
+        record = NULL_RECORD
+    else:   #正常读取到数据
+        #print len(records)
+        #print records[-1].date,records[-2].date,filename
+        if len(records)>0:
+            record = records[-1]
+        else:
+            record = NULL_RECORD
+    return record
+
+
 def concatenate(*args):
     result =  [[],[],[],[],[],[],[],[]]
     for arg in args:
@@ -103,16 +121,16 @@ def make_tick_filename(instrument,tday=0,suffix='txt'):
         tday = time.strftime('%Y%m%d')
     return '%s%s/%s_tick.%s' % (DATA_PATH,instrument,tday,suffix)
 
-def make_min_filename(instrument,suffix='txt'):
-    return '%s%s/%s_min.%s' % (DATA_PATH,instrument,time.strftime('%Y%m%d'),suffix)
+def make_min_filename(instrument,path=DATA_PATH,suffix='txt'):
+    return '%s%s/%s_min.%s' % (path,instrument,time.strftime('%Y%m%d'),suffix)
 
 
-make_his_filename = lambda path,name:'%s%s/%s' % (path,name,HISTORY_TXT)
+make_his_filename = lambda name,path=DATA_PATH:'%s%s/%s' % (path,name,HISTORY_TXT)
 
 def read1(instrument,length=6000,path=DATA_PATH,extractor=extract_std,readfunc=read_data):
     #6000是22天，足够应付日ATR计算
-    dhistory = read_min_as_list(make_his_filename(path,instrument),length=length,extractor=extractor,readfunc=readfunc)
-    dtoday = read_min_as_list(make_min_filename(path,instrument),length=length,extractor=extractor,readfunc=readfunc)
+    dhistory = read_min_as_list(make_his_filename(instrument,path),length=length,extractor=extractor,readfunc=readfunc)
+    dtoday = read_min_as_list(make_min_filename(instrument,path),length=length,extractor=extractor,readfunc=readfunc)
     hdata = BaseObject(name=instrument,instrument=instrument,transaction=concatenate(dhistory+dtoday))
     return hdata
 
@@ -123,6 +141,31 @@ def read1(instrument,length=6000,path=DATA_PATH,extractor=extract_std,readfunc=r
 def read_history(instrument_id,path):
     return read1(instrument_id,path=path)
 
+def read_history_last(instrument_id,path=DATA_PATH):
+    return read_last_record(make_his_filename(instrument_id,path))
+
+
+##检查是否需要合并历史数据和当日数据，如果需要则合并
+def check_merge(instrument_id,path=DATA_PATH):
+    last_history_date = read_history_last(instrument_id).date
+    cur_date = int(time.strftime('%Y%m%d'))
+    print cur_date,last_history_date
+    if cur_date > last_history_date:    #只有当日大于最后历史日时，才需要合并
+        cur_file = make_min_filename(instrument_id,path)
+        his_file = make_his_filename(instrument_id,path)
+        try:
+            hf = open(his_file,'a+')
+            cf = open(cur_file,'r')
+            hf.write(cf.read())
+        finally:
+            hf.close()
+            cf.close()
+        return True
+    else:
+        print u'不需要合并,instrument_id=%s 最后日=%s,当前日=%s' % (instrument_id,last_history_date,cur_date)
+        logger.debug(u'不需要合并, instrument=%s,最后日=%s,当前日=%s' % (instrument_id,last_history_date,cur_date))
+        return False
+
 #####################################################
 #分钟数据写入, 暂时写入到当日的分钟文件，而不是写到历史分钟文件中
 #####################################################
@@ -130,7 +173,7 @@ def i2s(iv):    #将.1转化为正常点. 以与从文化财经保存的一致
     return '%s.%s' % (iv/10,iv%10)
 
 def save1(instrument,min_data,path=DATA_PATH):
-    filename = make_min_filename(instrument)
+    filename = make_min_filename(instrument,path)
     ff = open(filename,'a+')
     sdate = '%s/%02d/%02d' % (min_data.vdate/10000,min_data.vdate/100%100,min_data.vdate%100)
     stime = '%02d:%02d' % (min_data.vtime/100,min_data.vtime%100)
