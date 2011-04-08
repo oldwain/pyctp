@@ -1257,11 +1257,12 @@ def save2():
     cuser_wt1= c.GD_USER_2  #网通
     cuser_wt2= c.GD_USER_4  #网通
 
-    my_agent = SaveAgent(None,None,INSTS,{})
+    my_agent = SaveAgent(None,None,INSTS_SAVE,{})
 
     #make_user(my_agent,cuser0,'data1')
-    #make_user(my_agent,cuser2,'data2')    
-    #make_user(my_agent,cuser_wt1,'data_wt1')
+    make_user(my_agent,cuser1,'data1')     
+    make_user(my_agent,cuser2,'data2')    
+    make_user(my_agent,cuser_wt1,'data_wt1')
     make_user(my_agent,cuser_wt2,'data_wt2')    
     
     #make_user(my_agent,cuser0,'data')
