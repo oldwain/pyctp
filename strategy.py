@@ -47,6 +47,8 @@ class Order(object):
 
     def on_trade(self,price,volume,trade_time):
         self.opened_volume += volume
+        if self.volume < self.opened_volume:    #因为cancel和成交的时间差导致的
+            self.volume = self.opened_volume
         self.trader_detail.append((price,volume,trade_time))
         self.position.re_calc()
         
@@ -57,6 +59,7 @@ class Order(object):
 
     def on_cancel(self):    #已经撤单
         self.cancelled = True
+        self.volume = self.opened_volume    #不会再有成交回报
         self.position.re_calc()
 
     def is_closed(self): #是否已经完全平仓
@@ -72,10 +75,13 @@ class Position(object):
         self.opened_volume = 0
         self.locked_volume = 0  #被当前头寸锁定的(包括持仓的和发出未成交的)
 
-    def calc_remained_volume(self):   #用来计算Position的当次可开仓数
+    def calc_open_volume(self):   #用来计算Position的当次可开仓数
         self.re_calc()
         #剩余开仓总数 = 策略持仓限量 - 已开仓数，若小于0则为0
         remained = self.strategy.max_holding - self.locked_volume if self.strategy.max_holding > self.locked_volume else 0
+        inst_remained = instrument.calc_remained_volume()
+        if remained > inst_remained:
+            remained = inst_remained
         #本次可开仓数 = 策略单次开仓数 和 剩余开仓总数 的小者
         return self.strategy.open_volume if self.strategy.open_volume <=  remained else remained
 
@@ -86,6 +92,10 @@ class Position(object):
 
     def add_order(self,order):
         self.orders.append(order)
+
+    def get_locked_volume(self):    #回复已经占用数
+        self.re_calc()
+        return self.locked_volume
 
 
 ###突破类策略

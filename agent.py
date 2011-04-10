@@ -36,6 +36,100 @@ acd_da_sz_b2
 
 ##因为流控原因,所有Qry命令都用Command模式?
   不需要,可以忍受1s的延时. 因为行情通过别的来接收  
+
+三类配置文件，都用INI格式记录
+1. 基本配置 base.ini  这个是完全私人的
+   记录登陆站点，登陆ID以及口令 
+
+    [Base]
+    ;User用于设定连接行情的设定 
+    users = User1,User2,User3
+    ;Trade用于设定连接交易端的设定
+    traders = Trader1,Trader2
+
+    [User1]
+    port = 
+    broker_id = 
+    investor_id = 
+    passwd = 
+
+    [User2]
+    ....
+
+2. 策略配置 strategy.ini
+   配置盯盘的合约(目前暂且只支持指定合约)
+   配置交易的合约, 每个合约可以指定多个策略
+
+    [Trace_Instruments]
+    traces = IF,CF,ZN
+
+    [IF]
+    main = IF1104
+    next = IF1105
+
+    [CF]
+    ...
+
+    [Trade_Instruments]
+    custom = strategy.py
+    trades = tIF,tCF
+
+    [tIF]
+    instrument = IF1104
+    max_volume = 2
+    strategys = IF_A,IF_B,IF_C
+
+    [IF_A]
+    max_holding = 2
+    open_volume = 1
+    opener = day_long_break
+    closer = datr_long_stoper
+    
+    [IF_B]
+    ...
+
+    [tCF]
+    ...
+    ...
+
+3. 中断恢复状态 state.ini
+   记录当前的持仓及相关策略,止损相关
+
+    [Time_Stamp]
+    lastupdate = 
+
+    [Holdings]
+    holdings = IF1104,IF1105,CF1109,
+
+    [IF1104]
+    instrment = IF1104
+    long_volume = xxxx
+    short_volume = xxxx
+    h_long = IF1104_L1,IF1104_L2
+    h_short = IF1104_S1,IF1104_S2
+
+    [IF1104_L1]
+    volume = xxxx
+    opener = xxxx
+    stoper = xxxx
+    open_price = 3200
+    current_stop_price = 3193
+
+    [IF1104_L2]
+    ...
+
+    [IF1104_S1]
+    ...
+
+    [IF1105]
+    ...
+    ...
+
+A. 中断恢复
+   中断恢复是在创建instrment之后，重新初始化Position和Order的过程 
+    
+
+
 '''
 
 import sched
@@ -349,10 +443,6 @@ class TraderSpiDelegate(TraderSpi):
 
 
     ###交易准备
-    def OnRspQryInstrument(self, pInstrument, pRspInfo, nRequestID, bIsLast):
-        #如果合约还要靠查才能确定，直接关机走人
-        pass
-
     def OnRspQryInstrumentMarginRate(self, pInstrumentMarginRate, pRspInfo, nRequestID, bIsLast):
         '''
             保证金率回报。返回的必然是绝对值
@@ -369,9 +459,11 @@ class TraderSpiDelegate(TraderSpi):
         '''
         if bIsLast and self.isRspSuccess(pRspInfo):
             self.agent.rsp_qry_instrument(pInstrument)
+            #print pInstrument
         else:
             #logging
-            pass
+            #print pInstrument
+            self.agent.rsp_qry_instrument(pInstrument)  #模糊查询的结果,获得了多个合约的数据，只有最后一个的bLast是True
 
 
     def OnRspQryTradingAccount(self, pTradingAccount, pRspInfo, nRequestID, bIsLast):
@@ -502,7 +594,7 @@ class c_instrument(object):
             if name not in objs:
                 print u'策略针对合约%s不在盯盘列表中' % (name,)
                 continue
-            objs[name].max_volume = item[0]
+            objs[name].max_volume = item[0] #
             objs[name].strategy = dict([(ss.get_name(),ss) for ss in item[1:]])
             objs[name].initialize_positions()
         return objs
@@ -518,7 +610,7 @@ class c_instrument(object):
         #持仓量
         #BaseObject(hlong,hshort,clong,cshort) #历史多、历史空、今日多、今日空 #必须与实际数据一致, 实际上没用到
         self.position = BaseObject(hlong=0,hshort=0,clong=0,cshort=0)
-        #持仓明细策略名==>(合约、策略名、策略、基准价、基准时间、orderref、持仓方向、持仓量、当前止损价)
+        #持仓明细策略名==>Position #(合约、策略名、策略、基准价、基准时间、orderref、持仓方向、持仓量、当前止损价)
         self.position_detail = {}   #在Agent的ontrade中设定, 并需要在resume中恢复
         #设定的最大持仓手数
         self.max_volume = 1
@@ -534,6 +626,12 @@ class c_instrument(object):
 
     def initialize_positions(self): #根据策略初始化头寸为0
         self.position_detail = dict([(ss.get_name,Position(self.name,ss)) for ss in self.strategy.values()])
+
+    def calc_remained_volume(self):   #计算剩余的可开仓量
+        locked_volume = 0
+        for position in self.position_detail.values():
+            locked_volume += position.get_locked_volume()
+        return self.max_volume - locked_volume if self.max_volume > locked_volume else 0
 
     def calc_margin_amount(self,price,direction):   
         '''
@@ -633,6 +731,8 @@ class Agent(AbsAgent):
         self.prepare_data_env()
         #调度器
         self.scheduler = sched.scheduler(time.time, time.sleep)
+        #盯盘合约
+        self.traces = set([])
 
     def set_spi(self,spi):
         self.spi = spi
@@ -733,6 +833,14 @@ class Agent(AbsAgent):
         r = self.trader.ReqQryInstrument(req,self.inc_request_id())
         print u'查询合约, 函数发出返回值:%s' % r
 
+    def fetch_instruments_by_exchange(self,exchange_id):
+        '''不能单独用exchange_id,因此没有意义
+        '''
+        req = ustruct.QryInstrument(
+                        ExchangeID=exchange_id,
+                )
+        r = self.trader.ReqQryInstrument(req,self.inc_request_id())
+        print u'查询合约, 函数发出返回值:%s' % r
 
     ##交易处理
     def RtnTick(self,ctick):#行情处理主循环
@@ -851,7 +959,7 @@ class Agent(AbsAgent):
         if (hreader.is_if(ctick.instrument) and ctick.min1 == 1514 and ctick.sec==59) or (not hreader.is_if(ctick.instrument) and ctick.min1 == 1459 and ctick.sec==59): #
             threading.Timer(30,self.day_finalize,args=[dinst,ctick.min1,ctick.sec,save_flag]).start()
             self.day_finalize(dinst)
-        threading.Timer(3,self.day_finalize,args=[dinst,ctick.min1,ctick.sec,save_flag]).start()
+        #threading.Timer(3,self.day_finalize,args=[dinst,ctick.min1,ctick.sec,save_flag]).start()
         return rev
     
     def check_close_signal(self,ctick):
@@ -905,7 +1013,7 @@ class Agent(AbsAgent):
             if mysignal[0] != 0:
                 base_price = mysignal[1] if mysignal[1]>0 else ctick.price
                 candidate = Order(instrument=cur_inst,
-                                position=cur_inst.position_details[ss.name],
+                                position=cur_inst.position_detail[ss.name],
                                 base_price=base_price,
                                 target_price=strategy.opener.calc_target_price(base_price,cur_inst.tick_base),
                                 mytime = ctike.time,
@@ -922,7 +1030,7 @@ class Agent(AbsAgent):
             计算order的可开仓数
             instrument: 合约对象
         '''
-        want_volume = order.position.calc_remained_volume()
+        want_volume = order.position.calc_open_volume()
         if want_volume <= 0:
             return 0
         margin_amount = instrument.calc_margin_amount(order.target_price,order.strategy.direction)
@@ -1173,9 +1281,15 @@ class SaveAgent(Agent):
             logger.info(u'接收到未订阅的合约数据:%s' % (inst,))
         dinst = self.instruments[inst].data
         self.prepare_base(dinst,ctick,save_flag=True)  
+    
+    def rsp_qry_instrument(self,pinstrument):
+        '''
+            获得合约名称
+        '''
+        self.traces.add(pinstrument.InstrumentID)
 
 
-import config as c 
+import config
 
 def make_user(my_agent,hq_user,name='data'):
     user = MdApi.CreateMdApi(name)
@@ -1188,95 +1302,81 @@ def make_user(my_agent,hq_user,name='data'):
                     ))
     user.RegisterFront(hq_user.port)
     
-    #user.RegisterFront(c.GD_USER.port)
-    #user.RegisterFront(c.GD_USER_3.port)    
-    #user.RegisterFront(c.GD_USER_2.port)        
-    #user.RegisterFront(c.GD_USER_4.port)            
     user.Init()
-    
 
-def user_main():
+
+def save_raw(base_name='base.ini',strategy_name='strategy.ini',base='Base',strategy='strategy'):
+    '''
+        按配置文件给定的绝对合约名保存
+        只用到MdUser
+        base_name是保存base设置的文件名
+        strategy_name是保存strategy设置的文件名
+
+    '''
     logging.basicConfig(filename="ctp_user_agent.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
+ 
+    base_cfg = config.parse_base(base_name,base)
+    strategy_cfg = config.parse_strategy(strategy_name,strategy)
+ 
+    my_insts = strategy_cfg.traces_raw
+
+    my_agent = SaveAgent(None,None,my_insts,{})
     
-    cuser0 = c.SQ_USER
-    cuser1 = c.GD_USER
-    cuser2 = c.GD_USER_3
-    cuser_wt1= c.GD_USER_2  #网通
-    cuser_wt2= c.GD_USER_4  #网通
+    for user in base_cfg.users:
+        make_user(my_agent,base_cfg.users[user],user)
 
-    my_agent = Agent(None,None,INSTS,{})
+    #获取合约列表
+    return my_agent
 
-    make_user(my_agent,cuser0,'data1')
-    #make_user(my_agent,cuser2,'data2')    
-    #make_user(my_agent,cuser_wt1,'data_wt1')
-    #make_user(my_agent,cuser_wt2,'data_wt2')    
-    
-    #make_user(my_agent,cuser0,'data')
-    #make_user(my_agent,cuser0,'data')
-    #make_user(my_agent,cuser0,'data')
-    #make_user(my_agent,cuser0,'data')
-    #make_user(my_agent,cuser0,'data')
-    #make_user(my_agent,cuser0,'data')
+def save_raw2():
+    save_raw(base_name='mybase.ini')
 
-    #while True:
-    #    time.sleep(1)
 
-def save1():
+def save(base_name='base.ini',strategy_name='strategy.ini',base='Base',strategy='strategy'): 
+    '''
+        根据配置文件给定的合约类型，查找所有合约，然后保存
+        用到了User和Trader
+    '''
     logging.basicConfig(filename="ctp_user_agent.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
+ 
+    cfg = config.parse_base(base_name,base)
+ 
+    ctrader = cfg.traders.values()[0]
+    trader = TraderApi.CreateTraderApi(ctrader.name)
+    t_agent = SaveAgent(trader,ctrader,[],{})
     
-    cuser0 = c.SQ_USER
-    cuser1 = c.GD_USER
-    cuser2 = c.GD_USER_3
-    cuser_wt1= c.GD_USER_2  #网通
-    cuser_wt2= c.GD_USER_4  #网通
-
-    my_agent = SaveAgent(None,None,INSTS,{})
-
-    make_user(my_agent,cuser0,'data1')
-    #make_user(my_agent,cuser2,'data2')    
-    #make_user(my_agent,cuser_wt1,'data_wt1')
-    #make_user(my_agent,cuser_wt2,'data_wt2')    
+    myspi = TraderSpiDelegate(instruments=t_agent.instruments, 
+                             broker_id=ctrader.broker_id,
+                             investor_id= ctrader.investor_id,
+                             passwd= ctrader.passwd,
+                             agent = t_agent,
+                       )
+    trader.RegisterSpi(myspi)
+    trader.SubscribePublicTopic(THOST_TERT_QUICK)
+    trader.SubscribePrivateTopic(THOST_TERT_QUICK)
+    trader.RegisterFront(ctrader.port)
+    trader.Init()
     
-    #make_user(my_agent,cuser0,'data')
-    #make_user(my_agent,cuser0,'data')
-    #make_user(my_agent,cuser0,'data')
-    #make_user(my_agent,cuser0,'data')
-    #make_user(my_agent,cuser0,'data')
-    #make_user(my_agent,cuser0,'data')
+    strategy_cfg = config.parse_strategy(strategy_name,strategy)
+    
+    time.sleep(15)
+    #print strategy_cfg.traces
+    for tin in strategy_cfg.traces:
+        print tin
+        t_agent.fetch_instrument(tin)
+        time.sleep(2)
 
-    #while True:
-    #    time.sleep(1)
+    #for user in cfg.users:
+    #    make_user(my_agent,cfg.users[user],user)
 
+    #获取合约列表
+    return t_agent
 
 def save2():
-    logging.basicConfig(filename="ctp_user_agent.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
-    
-    cuser0 = c.SQ_USER
-    cuser1 = c.GD_USER
-    cuser2 = c.GD_USER_3
-    cuser_wt1= c.GD_USER_2  #网通
-    cuser_wt2= c.GD_USER_4  #网通
-
-    my_agent = SaveAgent(None,None,INSTS_SAVE,{})
-
-    #make_user(my_agent,cuser0,'data1')
-    make_user(my_agent,cuser1,'data1')     
-    make_user(my_agent,cuser2,'data2')    
-    make_user(my_agent,cuser_wt1,'data_wt1')
-    make_user(my_agent,cuser_wt2,'data_wt2')    
-    
-    #make_user(my_agent,cuser0,'data')
-    #make_user(my_agent,cuser0,'data')
-    #make_user(my_agent,cuser0,'data')
-    #make_user(my_agent,cuser0,'data')
-    #make_user(my_agent,cuser0,'data')
-    #make_user(my_agent,cuser0,'data')
-
-    #while True:
-    #    time.sleep(1)
+    save(base_name='mybase.ini')
 
 
-def trade_test_main():
+def trade_test_main(name='base.ini',base='Base'):
     '''
 import agent
 trader,myagent = agent.trade_test_main()
@@ -1288,8 +1388,12 @@ trader.RegisterSpi(None)
     logging.basicConfig(filename="ctp_trade.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
     
     trader = TraderApi.CreateTraderApi("trader")
-    #cuser = c.SQ_TRADER1
-    cuser = c.SQ_TRADER2
+
+    cfg = config.parse_base(name,base)
+
+    cuser = cfg.traders.values()[0]
+    
+    #cuser = c.SQ_TRADER2
     my_agent = Agent(trader,cuser,INSTS,{})
     myspi = TraderSpiDelegate(instruments=my_agent.instruments, 
                              broker_id=cuser.broker_id,
