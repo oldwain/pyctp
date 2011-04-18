@@ -57,25 +57,29 @@ acd_da_sz_b2
     ....
 
 2. 策略配置 strategy.ini
-   配置盯盘的合约(目前暂且只支持指定合约)
+   配置盯盘的合约
    配置交易的合约, 每个合约可以指定多个策略
 
-    [Trace_Instruments]
-    traces = IF,CF,ZN
-
-    [IF]
-    main = IF1104
-    next = IF1105
-
-    [CF]
-    ...
-
-    [Trade_Instruments]
-    custom = strategy.py
-    trades = tIF,tCF
-
-    [tIF]
-    instrument = IF1104
+   a. 保存行情的设置, 其中[Trace_Instruments]为合约类设置
+[Trace_Instruments]
+traces = IF,ru,fu,zn,rb,pb,m,a,c,y,b,l,p,v,SR,CF,TA,WS,RO,ER,WT
+;a/al/au重复,c/cu重复
+;traces = IF,ru,fu,cu,al,zn,au,rb,pb,m,a,c,y,b,l,p,v,SR,CF,TA,WS,RO,ER,WT
+    ;[Trace_Instruments_Raw]为绝对设置
+[Trace_Instruments_Raw]
+IFs = IF1104,IF1105,IF1106,IF1109
+CFs = CF109,CF107
+   b. 交易策略定制 (todo:将来考虑自动判断主力合约) 
+    [Alias_Def]
+    IF_main = IF1105
+    CF_main = CF109
+    ;TODO:确定main之后,计算next,third,fourth,分别表示次合约、第三合约、第四合约. 找到主力合约后，按字母序确定
+    [Trade_Config]
+    ;如果策略文件为strategy，则可以不写
+    ;strategy_file = strategy
+    traces = IF_main,CF_main
+    
+    [IF_main]
     max_volume = 2
     strategys = IF_A,IF_B,IF_C
 
@@ -88,9 +92,6 @@ acd_da_sz_b2
     [IF_B]
     ...
 
-    [tCF]
-    ...
-    ...
 
 3. 中断恢复状态 state.ini
    记录当前的持仓及相关策略,止损相关
@@ -731,8 +732,6 @@ class Agent(AbsAgent):
         self.prepare_data_env()
         #调度器
         self.scheduler = sched.scheduler(time.time, time.sleep)
-        #盯盘合约
-        self.traces = set([])
 
     def set_spi(self,spi):
         self.spi = spi
@@ -1286,7 +1285,8 @@ class SaveAgent(Agent):
         '''
             获得合约名称
         '''
-        self.traces.add(pinstrument.InstrumentID)
+        if pinstrument.InstrumentID not in self.instruments:
+            self.instruments[pinstrument.InstrumentID] = c_instrument(pinstrument.InstrumentID)
 
 
 import config
@@ -1329,7 +1329,7 @@ def save_raw(base_name='base.ini',strategy_name='strategy.ini',base='Base',strat
     return my_agent
 
 def save_raw2():
-    save_raw(base_name='mybase.ini')
+    return save_raw(base_name='mybase.ini')
 
 
 def save(base_name='base.ini',strategy_name='strategy.ini',base='Base',strategy='strategy'): 
@@ -1359,12 +1359,12 @@ def save(base_name='base.ini',strategy_name='strategy.ini',base='Base',strategy=
     
     strategy_cfg = config.parse_strategy(strategy_name,strategy)
     
-    time.sleep(15)
+    time.sleep(20)
     #print strategy_cfg.traces
     for tin in strategy_cfg.traces:
         print tin
         t_agent.fetch_instrument(tin)
-        time.sleep(2)
+        time.sleep(30)
 
     #for user in cfg.users:
     #    make_user(my_agent,cfg.users[user],user)
@@ -1373,7 +1373,7 @@ def save(base_name='base.ini',strategy_name='strategy.ini',base='Base',strategy=
     return t_agent
 
 def save2():
-    save(base_name='mybase.ini')
+    return save(base_name='mybase.ini')
 
 
 def trade_test_main(name='base.ini',base='Base'):

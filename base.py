@@ -7,6 +7,7 @@ LONG,SHORT,EMPTY = -1,1,0   #多仓出钱,淡仓收钱
 #开平仓的标志
 XOPEN,XCLOSE = -1,1 #开仓,平仓
 
+XBASE = 100 #用于一般化的除数基数
 
 import sys
 from functools import partial
@@ -31,6 +32,17 @@ def func_name(func):    #取到真实函数名. 可能只适用于python2.x
         cfunc = cfunc.func
     return str(cfunc)[10:-15]
 
+def type_name(cobj): #取到由class实例化的对象的type名
+    aname = str(type(cobj))[8:-2]
+    return aname.split('.')[-1]
+
+def module_name(cobj): #取到由class实例化的对象所在的模块名
+    aname = str(type(cobj))[8:-2]
+    return aname.split('.')[0]
+
+def class_name(cobj): #取到由class实例化的对象的模块名和type名
+    aname = str(type(cobj))[8:-2]
+    return tuple(aname.split('.'))
 
 
 class BaseObject(object):
