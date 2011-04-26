@@ -149,7 +149,7 @@ import UserApiType as utype
 from MdApi import MdApi, MdSpi
 from TraderApi import TraderApi, TraderSpi  
 
-
+import config
 
 #数据定义中唯一一个enum
 THOST_TERT_RESTART  = 0
@@ -626,7 +626,7 @@ class c_instrument(object):
         self.data = BaseObject()
 
     def initialize_positions(self): #根据策略初始化头寸为0
-        self.position_detail = dict([(ss.get_name,Position(self.name,ss)) for ss in self.strategy.values()])
+        self.position_detail = dict([(ss.get_name(),Position(self.name,ss)) for ss in self.strategy.values()])
 
     def calc_remained_volume(self):   #计算剩余的可开仓量
         locked_volume = 0
@@ -698,6 +698,7 @@ class Agent(AbsAgent):
         ##
         self.trader = trader
         self.cuser = cuser
+        self.strategy = my_strategy
         self.instruments = c_instrument.create_instruments(instruments,my_strategy)
         self.request_id = 1
         self.initialized = False
@@ -973,6 +974,7 @@ class Agent(AbsAgent):
             print u'需要监控的%s未记录行情数据'
             return signals
         cur_inst = self.instruments[ctick.instrument]
+        is_touched = False  #止损位变化
         for position in cur_inst.position_detail.values():
             for order in position.orders:
                 if order.opened_volume > 0:
@@ -988,6 +990,10 @@ class Agent(AbsAgent):
                                 action_type = XCLOSE,
                             )
                         )
+                    if mysignal[2] != 0:#止损位置变化
+                        is_touched = True
+        if is_touched:
+            self.save_state()
         return signals
 
     def check_open_signal(self,ctick):
@@ -1008,7 +1014,7 @@ class Agent(AbsAgent):
             return signals
         cur_inst = self.instruments[ctick.instrument]
         for ss in cur_inst.strategy.values():
-            mysignal = ss.opener(cur_inst.data,ctick)
+            mysignal = ss.opener.check(cur_inst.data,ctick)
             if mysignal[0] != 0:
                 base_price = mysignal[1] if mysignal[1]>0 else ctick.price
                 candidate = Order(instrument=cur_inst,
@@ -1143,6 +1149,23 @@ class Agent(AbsAgent):
     def finalize(self):
         pass
 
+    def save_state(self):
+        '''
+            保存环境
+        '''
+        state = BaseObject(last_update=int(time.strftime('%Y%m%d')),holdings={})
+        cur_orders = {} #instrument==>orders
+        for inst in self.instruments.values():
+            for position in inst.position_detail.values():
+                if position.opened_volume>0:
+                    iorders = cur_orders.setdefault(position.instrument,[])
+                    iorders.extend([order for order in position.orders if order.opened_volume>0])
+        for inst,orders in cur_orders.items():
+            cin = BaseObject(instrument = inst,opened_volume=sum([order.opened_volume for order in orders]),orders=orders)
+            state.holdings[inst] = cin
+        config.save_state(state)
+        return
+            
     def resume(self):
         '''
             恢复环境
@@ -1152,7 +1175,16 @@ class Agent(AbsAgent):
                 3. 获得当日持仓，并初始化止损. 
                 暂时要求历史数据和当日已发生的分钟数据保存在一个文件里面整体读取
         '''
-        pass
+        state = config.parse_state(self.strategy)
+        cposs = set([])
+        for chd in state.holdings:
+            cur_inst = self.instruments[chd.instrument]
+            for order in chd.orders:
+                cur_position = cur_inst.position_detail[order.strategy_name]
+                cur_position.add_order(order)
+                cposs.add(cur_position)
+        for pos in cposs:
+            pos.re_calc()
 
 
     ###交易
@@ -1173,6 +1205,7 @@ class Agent(AbsAgent):
             myorder.on_trade(price=int(strade.Price*10+0.1),volume=strade.Volume,trade_time=strade.TradeTime)
         else:
             myorder.source_order.on_close(price=int(strade.Price*10+0.1),volume=strade.Volume,trade_time=strade.TradeTime)
+        self.save_state()
         ##查询可用资金
         self.put_command(self.get_tick()+1,self.fetch_trading_account)
 
@@ -1288,8 +1321,6 @@ class SaveAgent(Agent):
         if pinstrument.InstrumentID not in self.instruments:
             self.instruments[pinstrument.InstrumentID] = c_instrument(pinstrument.InstrumentID)
 
-
-import config
 
 def make_user(my_agent,hq_user,name='data'):
     user = MdApi.CreateMdApi(name)

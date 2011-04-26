@@ -10,7 +10,7 @@ XOPEN,XCLOSE = -1,1 #开仓,平仓
 XBASE = 100 #用于一般化的除数基数
 
 import sys
-from functools import partial
+import functools
 
 def inverse_direction(direction):
     return LONG if direction == SHORT else SHORT
@@ -18,7 +18,7 @@ def inverse_direction(direction):
 def fcustom(func,**kwargs):
     ''' 根据kwargs设置func的偏函数,并将此偏函数的名字设定为源函数名+所固定的关键字参数名
     '''
-    pf = partial(func,**kwargs)
+    pf = functools.partial(func,**kwargs)
     #pf.name = pf.func.func_name
     pf.paras = ','.join(['%s=%s' % item for item in pf.keywords.items()])
     pf.__name__ = '%s:%s' % (func.__name__,pf.paras)
@@ -33,17 +33,25 @@ def func_name(func):    #取到真实函数名. 可能只适用于python2.x
     return str(cfunc)[10:-15]
 
 def type_name(cobj): #取到由class实例化的对象的type名
-    aname = str(type(cobj))[8:-2]
+    clazz_obj = cobj
+    while(isinstance(clazz_obj,functools.partial)):
+        clazz_obj = clazz_obj.func
+    aname = str(type(clazz_obj))[8:-2]
     return aname.split('.')[-1]
 
 def module_name(cobj): #取到由class实例化的对象所在的模块名
-    aname = str(type(cobj))[8:-2]
+    clazz_obj = cobj
+    while(isinstance(clazz_obj,functools.partial)):
+        clazz_obj = clazz_obj.func
+    aname = str(type(clazz_obj))[8:-2]
     return aname.split('.')[0]
 
 def class_name(cobj): #取到由class实例化的对象的模块名和type名
-    aname = str(type(cobj))[8:-2]
+    clazz_obj = cobj
+    while(isinstance(clazz_obj,functools.partial)):
+        clazz_obj = clazz_obj.func
+    aname = str(type(clazz_obj))[8:-2]
     return tuple(aname.split('.'))
-
 
 class BaseObject(object):
     def __init__(self,**kwargs):
