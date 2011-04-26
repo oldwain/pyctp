@@ -144,7 +144,7 @@ CFs = CF109,CF107
             current_strategy = base.BaseObject(name=sscs)
             current_strategy.max_holding = int(cfg.get(sscs,'max_holding'))
             current_strategy.open_volume = int(cfg.get(sscs,'open_volume'))
-            current_strategy.opener = smod.__dict__[cfg.get(sscs,'opener').strip()]
+            current_strategy.opener = smod.__dict__[cfg.get(sscs,'opener').strip()]()   #需要实例化
             current_strategy.closer = smod.__dict__[cfg.get(sscs,'closer').strip()]
             cs.strategys.append(current_strategy)
         config.strategy[sti] = cs
@@ -164,16 +164,20 @@ def parse_state(strategy_cfg,name='state.ini',root='State'):
     opened_orders = IF1105_O1,IF1105_O2
 
     [IF1105_O1]
+    name = IF_A
     volume = 3
-    opener = day_long_break
+    strategy = IF_A    
+    ;opener = day_long_break
     stoper = datr_long_stoper_12
     base_price = 32000
     current_stop_price = 31930
     ;target_price = 0
 
     [IF1105_O2]
+    name = IF_B
     volume = 1
-    opener = day_short_break
+    strategy = IF_A    
+    ;opener = day_short_break
     stoper = datr_short_stoper_12
     base_price = 32500
     current_stop_price = 32570
@@ -205,8 +209,11 @@ def parse_state(strategy_cfg,name='state.ini',root='State'):
                 continue
             order = base.BaseObject(instrument=chd.instrument)
             order.volume = int(cfg.get(soo,'volume'))
-            order.opener = strategy_cfg.smodule.__dict__[cfg.get(soo,'opener').strip()]
-            order.stoper_class = strategy_cfg.smodule.__dict__[cfg.get(soo,'stoper').strip()]
+            order.strategy_name = cfg.get(soo,'strategy_name'))
+            #order.opener = strategy_cfg.smodule.__dict__[cfg.get(soo,'opener').strip()] #仅用于判断strategy
+            #order.stoper_class = strategy_cfg.smodule.__dict__[cfg.get(soo,'stoper').strip()]
+            order.stoper = strategy_cfg.smodule.__dict__[cfg.get(soo,'stoper').strip()]()
+            order.stoper.load_parameters(cfg.get(soo,'stoper_parameters').strip())
             order.base_price = int(cfg.get(soo,'base_price').strip())
             order.current_stop_price = int(cfg.get(soo,'current_stop_price').strip())
             if cfg.has_option(soo,'target_price'):
@@ -230,7 +237,8 @@ def save_state(state,name='state.ini',root='State'):
 
     [IF1105_O1]
     volume = 3
-    opener = day_long_break
+    ;opener = day_long_break
+    strategy = IF_A
     stoper = datr_long_stoper_12
     base_price = 32000
     current_stop_price = 31930
@@ -238,7 +246,8 @@ def save_state(state,name='state.ini',root='State'):
 
     [IF1105_O2]
     volume = 1
-    opener = day_short_break
+    ;opener = day_short_break
+    strategy = IF_B
     stoper = datr_short_stoper_12
     base_price = 32500
     current_stop_price = 32570
@@ -267,10 +276,14 @@ def save_state(state,name='state.ini',root='State'):
             cfg.set(mystr,'volume',order.volume)
             cfg.set(mystr,'base_price',order.base_price)
             cfg.set(mystr,'current_stop_price',order.current_stop_price)
+            cfg.set(mystr,'strategy_name',order.get_strategy_name())
+            #cfg.set(mystr,'opener',base.type_name(order.get_opener()))
+            #cfg.set(mystr,'opener_parameters',order.get_opener().save_parameters())
+            cfg.set(mystr,'stoper',base.type_name(order.get_stoper()))
+            cfg.set(mystr,'stoper_parameters',order.stoper.save_parameters())
             if order.target_price>0:
                 cfg.set(mystr,'target_price',order.target_price)
         cfg.set(key,'opened_orders',','.join(ostr))
-
     fo = open(CONFIG_PATH + name,'w+')
     cfg.write(fo)
     fo.close()

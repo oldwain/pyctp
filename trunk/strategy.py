@@ -66,6 +66,14 @@ class Order(object):
     def is_closed(self): #是否已经完全平仓
         return self.cancelled and self.opened_volume == 0
 
+    def get_opener(self):
+        return self.position.strategy.opener
+
+    def get_stoper(self):
+        return self.stoper
+
+    def get_strategy_name(self):
+        return self.position.strategy.name
 
 ####头寸
 class Position(object):
@@ -123,6 +131,10 @@ class Resumable(object):#可中间恢复
 
 ###突破类策略
 ###突破类策略以当前价为基准价，以一定额度的加价作为开仓限价以确保开仓，同时根据基准价来计算止损
+'''
+    check方法签名为(self,data,ctick)
+'''
+
 MAX_OVERFLOW = 60   #最大溢点，即开仓时加价跳数
 VALID_LENGTH = 120  #行情跳数, 至少两分钟(视行情移动为准)
 
@@ -172,11 +184,11 @@ class SHORT_ENTRY(ENTRY):    #空头回归策略
 
 #####具体策略
 class day_long_break(LONG_BREAK):
-    def check(self):
+    def check(self,data,ctick):
         return (0,0)
 
 class day_short_break(SHORT_BREAK):
-    def check(self):
+    def check(self,data,ctick):
         return (0,0)
 
 
@@ -251,19 +263,21 @@ class DATR_LONG_STOPER(LONG_STOPER):#日ATR多头止损
 
     def check(self,tick):
         '''
-            必须返回(平仓标志, 基准价)
+            必须返回(平仓标志, 基准价,stop变化标志)
             基准价为0则为当前价
         '''
+        stop_changed = False
         if tick.price < self.get_cur_stop():
-            return (1,tick.price)
+            return (1,tick.price,stop_changed)
         if self.get_cur_stop()< self.get_base_line() and tick.price > self.get_base_line() + self.keeper:
             ##提升保本
             self.set_cur_stop(self.get_base_line())
+            stop_changed = True
         if tick.price > self.thigh:
             self.thigh = tick.price
             if self.thigh - self.max_drawdown > self.get_cur_stop():
                 self.set_cur_stop(self.thigh - self.max_drawdown)
-        return (0,0)       
+        return (0,0,0)
 
 class DATR_SHORT_STOPER(SHORT_STOPER):#日ATR空头止损
     def __init__(self,data,bline,rbase=0.12,rkeeper=0.2,rdrawdown = 0.4):
@@ -278,7 +292,7 @@ class DATR_SHORT_STOPER(SHORT_STOPER):#日ATR空头止损
 
     def check(self,tick):
         '''
-            必须返回(平仓标志, 基准价)
+            必须返回(平仓标志, 基准价,stop变化标志)
             基准价为0则为当前价
         '''
         if tick.price > self.get_cur_stop():
@@ -290,7 +304,7 @@ class DATR_SHORT_STOPER(SHORT_STOPER):#日ATR空头止损
             self.tlow = tick.price
             if self.tlow - self.max_drawdown > self.get_cur_stop():
                 self.set_cur_stop(self.tlow - self.max_drawdown)
-        return (0,0)       
+        return (0,0,0)       
 
 
 datr_long_stoper_12 = fcustom(DATR_LONG_STOPER,rbase=0.12)
