@@ -145,7 +145,7 @@ def read1m(instrument,tday,length=6000,path=DATA_PATH,extractor=extract_std,read
     dhistory = read_min_as_list(make_his_filename(instrument,path),length=length,extractor=extractor,readfunc=readfunc,t2order=t2order)
     dtoday = read_min_as_list(make_min_filename_c(instrument,tday,path),length=length,extractor=extractor,readfunc=readfunc,t2order=t2order)
     hdata = BaseObject(name=instrument,instrument=instrument,transaction=concatenate(dhistory,dtoday))
-    return hdata,dhistory,dtoday
+    return hdata#,dhistory,dtoday
 
 
 #不从zip读数据
@@ -156,8 +156,7 @@ def read_history(instrument_id,path):
     return read1(instrument_id,path=path)
 
 def read_history_c(instrument_id,tday,path):#指定当前日，用于测试
-    return read1(instrument_id,tday,path=path)
-
+    return read1m(instrument_id,tday=tday,path=path)
 
 def read_history_last(instrument_id,path=DATA_PATH):
     return read_last_record(make_his_filename(instrument_id,path))
@@ -211,11 +210,11 @@ def save1(instrument,min_data,path=DATA_PATH):
 ##############################################################################
 ##基本数据准备
 ##############################################################################
-def prepare_data(instruments,path=DATA_PATH):
+def prepare_data(instruments,tday,path=DATA_PATH):
     data = {}
     for inst in instruments:
         PREPARER = PREPARER_INST
-        tdata = read_history(inst,path)
+        tdata = read_history_c(inst,tday,path)
         tdata.m1 = tdata.transaction
         ###基本序列按1分钟设定,方便快捷查找
         tdata.sdate = tdata.m1[IDATE]

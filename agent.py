@@ -625,6 +625,7 @@ class c_instrument(object):
         #   tdata.cur_day是当日的行情，包括开盘,最高,最低,当前价格,持仓,累计成交量, 其中最高/最低有两类，一者是tick的当前价集合得到的，一者是tick中的最高/最低价得到的
         self.t2order = t2order_if if hreader.is_if(self.name) else t2order_com
         self.data = BaseObject()
+        self.begin_flag = False #save标志，默认第一个不保存, 因为第一次切换的上一个是历史数据
 
     def initialize_positions(self): #根据策略初始化头寸为0
         self.position_detail = dict([(ss.get_name(),Position(self.name,ss)) for ss in self.strategy.values()])
@@ -695,9 +696,10 @@ class AbsAgent(object):
 class Agent(AbsAgent):
     logger = logging.getLogger('ctp.agent')
 
-    def __init__(self,trader,cuser,instruments,my_strategy):
+    def __init__(self,trader,cuser,instruments,my_strategy,tday=0):
         '''
             trader为交易对象
+            tday为当前日,为0则为当日
         '''
         AbsAgent.__init__(self)
         ##计时, 用来激发队列
@@ -720,7 +722,7 @@ class Agent(AbsAgent):
         self.session_id = None
         self.order_ref = 1
         self.trading_day = 20110101
-        self.scur_day = int(time.strftime('%Y%m%d'))
+        self.scur_day = int(time.strftime('%Y%m%d')) if tday==0 else tday
         #当前资金/持仓
         self.available = 0  #可用资金
         ##查询命令队列
@@ -739,6 +741,8 @@ class Agent(AbsAgent):
         self.prepare_data_env()
         #调度器
         self.scheduler = sched.scheduler(time.time, time.sleep)
+        #保存锁
+        self.lock = threading.Lock()
 
     def set_spi(self,spi):
         self.spi = spi
@@ -789,7 +793,7 @@ class Agent(AbsAgent):
         '''
             准备数据环境, 如需要的30分钟数据
         '''
-        hdatas = hreader.prepare_data([name for name in self.instruments])
+        hdatas = hreader.prepare_data([name for name in self.instruments],self.scur_day)
         for hdata in hdatas.values():
             self.instruments[hdata.name].data = hdata
             for dfo in self.data_funcs:
@@ -884,20 +888,21 @@ class Agent(AbsAgent):
            将当日数据复制到history.txt 
         '''
         #print ddata.name,last_min,last_sec
-        ddata = dinst.data
-        '''
-        if ddata.cur_min.vtime > last_min:  #存在151500或150000,不需要继续转换
-            print u'%s存在151500或150000,ddata.cur_min=%s,last_min=%s' % (ddata.name,ddata.cur_min.vtime,last_min)
-            self.logger.info(u'%s存在151500或150000,ddata.cur_min=%s,last_min=%s' % (ddata.name,ddata.cur_min,last_min))
-        else:   #不存在151500或150000.则将最后一分钟保存
-            self.save_min(dinst,save_flag)
-        '''
-        last_current_time = hreader.read_current_last(dinst.name).time
-        print 'time:',last_current_time,last_min
-        if last_current_time < last_min:    #如果已经有当分钟的记录，就不再需要保存了。
-            self.save_min(dinst,save_flag)  
-        print 'in day_finalize'
-        hreader.check_merge(ddata.name)
+        with self.lock:
+            ddata = dinst.data
+            '''
+            if ddata.cur_min.vtime > last_min:  #存在151500或150000,不需要继续转换
+                print u'%s存在151500或150000,ddata.cur_min=%s,last_min=%s' % (ddata.name,ddata.cur_min.vtime,last_min)
+                self.logger.info(u'%s存在151500或150000,ddata.cur_min=%s,last_min=%s' % (ddata.name,ddata.cur_min,last_min))
+            else:   #不存在151500或150000.则将最后一分钟保存
+                self.save_min(dinst,save_flag)
+            '''
+            last_current_time = hreader.read_current_last(dinst.name).time
+            print 'time:',last_current_time,last_min
+            if last_current_time < last_min:    #如果已经有当分钟的记录，就不再需要保存了。
+                self.save_min(dinst,save_flag)  
+            #print 'in day_finalize'
+            hreader.check_merge(ddata.name)
 
     def save_min(self,dinst,save_flag=True):
         ddata = dinst.data
@@ -910,7 +915,7 @@ class Agent(AbsAgent):
         ddata.sholding.append(ddata.cur_min.vholding)
         ddata.svolume.append(ddata.cur_min.vvolume)
         ddata.siorder.append(dinst.get_order(ddata.cur_min.vtime))
-        print 'in save_min'
+        #print 'in save_min'
         ##需要save下
         if save_flag == True:
             hreader.save1(dinst.name,ddata.cur_min)
@@ -939,11 +944,18 @@ class Agent(AbsAgent):
                     ddata.cur_min.vholding = ctick.holding
                     ddata.cur_min.vvolume += (ctick.dvolume - ddata.cur_day.vvolume)
                 '''
-                if ddata.cur_min.vdate != 0:    #不是史上第一个
-                    print u'正常保存分钟数据.......'
-                    self.save_min(ddata,save_flag)
-                else:#是史上第一分钟，之前的cur_min是默认值, 即无保存价值
-                    print u'不保存分钟数据,date=%s' % (ddata.cur_min.vdate)
+                #if ddata.cur_min.vdate != 0:    #不是史上第一个
+                #    #print u'正常保存分钟数据.......'
+                #    self.save_min(dinst,save_flag)
+                #else:#是史上第一分钟，之前的cur_min是默认值, 即无保存价值
+                #    #print u'不保存分钟数据,date=%s' % (ddata.cur_min.vdate)
+                #    rev = False
+                if dinst.begin_flag:
+                    #print u'保存分钟数据,date=%s,time=%s' % (ddata.cur_min.vdate,ddata.cur_min.vtime)
+                    self.save_min(dinst,save_flag)
+                else:
+                    #print u'第-1分钟数据不保存,date=%s,time=%s' % (ddata.cur_min.vdate,ddata.cur_min.vtime)
+                    dinst.begin_flag = True
                     rev = False
             ddata.cur_min.vdate = ctick.date
             ddata.cur_min.vtime = ctick.min1
@@ -954,9 +966,9 @@ class Agent(AbsAgent):
             ddata.cur_min.vholding = ctick.holding
             ddata.cur_min.vvolume = ctick.dvolume - ddata.cur_day.vvolume if ctick.date == ddata.cur_day.vdate else ctick.dvolume
             ddata.cur_min.viorder = ctick.iorder
-            print 'in change:',ddata.cur_min.vvolume
+            #print 'in change:',ddata.cur_min.vvolume
         elif ctick.iorder == ddata.cur_min.viorder or (ctick.iorder == ddata.cur_min.viorder + 1 and ctick.sec == 0 and ctick.msec==0):#当分钟的处理. 在接续时，如果resume时间正好是当分钟，会发生当分钟重复计数
-            print ddata.cur_min.vvolume,ctick.dvolume,ddata.cur_day.vvolume,ctick.time,ctick.sec,ctick.msec
+            #print ddata.cur_min.vvolume,ctick.dvolume,ddata.cur_day.vvolume,ctick.time,ctick.sec,ctick.msec
             ddata.cur_min.vclose = ctick.price
             if ctick.price > ddata.cur_min.vhigh:
                 ddata.cur_min.vhigh = ctick.price
@@ -964,7 +976,7 @@ class Agent(AbsAgent):
                 ddata.cur_min.vlow = ctick.price
             ddata.cur_min.vholding = ctick.holding
             ddata.cur_min.vvolume += (ctick.dvolume - ddata.cur_day.vvolume)
-            print ddata.cur_min.vvolume
+            #print ddata.cur_min.vvolume
         else:#早先的tick，只在测试时用到
             pass
         ##日的处理
