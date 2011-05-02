@@ -90,9 +90,9 @@ class MockMd(object):
 class SaveMock(object):
     '''简单起见，只模拟一个合约，用于功能测试
     '''
-    def __init__(self,instrument):
+    def __init__(self,instrument,tday=0):
         self.instrument = instrument
-        self.agent = agent.SaveAgent(None,None,[instrument],{})
+        self.agent = agent.SaveAgent(None,None,[instrument],{},tday=tday)
 
     def play(self,tday=0):
         ticks = hreader.read_ticks(self.instrument,tday)
@@ -156,7 +156,7 @@ def trade_mock(instrument='IF1104'):
  
     trader = TraderMock()
     
-    strategy_cfg = config.parse_strategy(strategy_name,strategy)
+    strategy_cfg = config.parse_strategy()
  
     myagent = agent.Agent(trader,None,[instrument],strategy_cfg.strategy) 
 
