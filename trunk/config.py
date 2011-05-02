@@ -209,7 +209,7 @@ def parse_state(strategy_cfg,name='state.ini',root='State'):
                 continue
             order = base.BaseObject(instrument=chd.instrument)
             order.volume = int(cfg.get(soo,'volume'))
-            order.strategy_name = cfg.get(soo,'strategy_name'))
+            order.strategy_name = cfg.get(soo,'strategy_name')
             #order.opener = strategy_cfg.smodule.__dict__[cfg.get(soo,'opener').strip()] #仅用于判断strategy
             #order.stoper_class = strategy_cfg.smodule.__dict__[cfg.get(soo,'stoper').strip()]
             order.stoper = strategy_cfg.smodule.__dict__[cfg.get(soo,'stoper').strip()]()

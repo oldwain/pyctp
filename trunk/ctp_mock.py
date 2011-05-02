@@ -19,10 +19,10 @@ TODO:   为真实起见，在mock中采用Command模式
 import time
 import hreader
 import agent
+import config
 
 class TraderMock(object):
-    def __init__(self,myagent):
-        '''记录agent以回调agent的成交回报接口'''
+    def initialze(self,myagent):
         self.myagent = myagent
 
     def ReqOrderInsert(self, order, request_id):
@@ -50,6 +50,22 @@ class TraderMock(object):
                     OrderRef = corder.OrderRef,
                 )
         self.myagent.rtn_order(rorder)
+
+    def ReqQryTradingAccount(self,req,req_id):
+        account = BaseObject(Available=1000000) #测试余额总是100W
+        self.myagent.rsp_qry_trading_account(account)
+
+    def ReqQryInstrument(self,req,req_id):#只有唯一一个合约
+        ins = BaseObject(InstrumentID = req.InstrumentID,VolumeMultiple = 300,PriceTick=0.2)
+        self.myagent.rsp_qry_instrument(ins)
+
+    def ReqQryInstrumentMarginRate(self,req,req_id):
+        mgr = BaseObject(InstrumentID = req.InstrumentID,LongMarginRatioByMoney=0.17,ShortMarginRatioByMoney=0.17)
+        self.myagent.rsp_qry_instrument_marginrate(mgr)
+
+    def ReqQryInvestorPosition(self,req,req_id):
+        #暂默认无持仓
+        pass
 
 
 class UserMock(object):
@@ -83,7 +99,6 @@ class SaveMock(object):
         for tick in ticks:
             self.agent.RtnTick(tick)
             #self.agent.RtnTick(tick)
-
 
 import time
 import logging
@@ -136,46 +151,16 @@ class NULLAgent(object):
         pass
 
 
-from agent import MdApi,MdSpiDelegate,c,INSTS_SAVE
+def trade_mock(instrument='IF1104'):
+    logging.basicConfig(filename="ctp_trade_mock.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
+ 
+    trader = TraderMock()
+    
+    strategy_cfg = config.parse_strategy(strategy_name,strategy)
+ 
+    myagent = agent.Agent(trader,None,[instrument],strategy_cfg.strategy) 
 
-def user_save1():
-    logging.basicConfig(filename="ctp_user.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
+    ticks = hreader.read_ticks(instrument,20110329)    #不加载当日数据
+    for tick in ticks:
+        myagent.agent.RtnTick(tick)
 
-
-    cuser0 = c.SQ_USER
-    cuser1 = c.GD_USER
-    cuser2 = c.GD_USER_3
-    cuser_wt1= c.GD_USER_2  #网通
-    cuser_wt2= c.GD_USER_4  #网通
-
-    my_agent = NULLAgent(None,None,INSTS_SAVE)
-
-    agent.make_user(my_agent,cuser0,'data')
-
-    #while True:
-    #    time.sleep(1)
-
-    return my_agent
-
-
-def user_save2():
-    logging.basicConfig(filename="ctp_user.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
-
-    cuser0 = c.SQ_USER
-    cuser1 = c.GD_USER
-    cuser2 = c.GD_USER_3
-    cuser_wt1= c.GD_USER_2  #网通
-    cuser_wt2= c.GD_USER_4  #网通
-
-    my_agent = NULLAgent(None,None,INSTS_SAVE)
-
-    #agent.make_user(my_agent,cuser0,'data')
-    agent.make_user(my_agent,cuser1,'data1')
-    agent.make_user(my_agent,cuser2,'data2')
-    agent.make_user(my_agent,cuser_wt2,'data3')
-
-    #while True:
-    #    time.sleep(1)
-
-    return my_agent
-   
