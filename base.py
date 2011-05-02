@@ -1,6 +1,6 @@
 #-*- coding:utf-8 -*-
 
-IDATE,ITIME,IOPEN,ICLOSE,IHIGH,ILOW,IVOL,IHOLDING = 0,1,2,3,4,5,6,7
+IDATE,ITIME,IOPEN,ICLOSE,IHIGH,ILOW,IVOL,IHOLDING,IORDER = 0,1,2,3,4,5,6,7,8
 
 #多空标志
 LONG,SHORT,EMPTY = -1,1,0   #多仓出钱,淡仓收钱
@@ -82,4 +82,32 @@ class CommonObject(BaseObject):
 LINELENGTH = 60
 def linelog(msg):   #在同一行覆盖显示日志输出
     sys.stdout.write(unicode((u'\r%s%s' % (msg,' ' * (LINELENGTH - len(msg)))))) #.encode('gbk'))  #适应输出编码为gbk
+
+
+##这段代码来自于回测平台。根据lvzhl的建议演化而来,主要用于方便统一计算IF和商品的3/5/10/15/30/...等周期数据
+##对于1130和最后一个时点的计算与回测平台不同, 为兼容ticks处理
+def calc_t2order(begin,end,(mid1,mid2)=(1130,1300)):
+    ##为便于计算30分钟线，商品的节休息段仍然计算序号. 这样，1000->1029算一个30分钟段
+    t2order = {}
+    nbegin = begin / 100 * 60 + begin % 100
+    for i in range(begin,mid1):
+        if i%100 > 59:
+            continue
+        it = i/100 * 60 + i%100
+        t2order[i] = it - nbegin
+
+    t2order[mid1] = it - nbegin
+
+    for i in range(mid2,end):
+        it = i/100 * 60 + i%100
+        t2order[i] = it - nbegin - 90
+
+    t2order[end] = it - nbegin - 90
+    return t2order
+
+#IF: time-->order
+t2order_if = calc_t2order(914,1515)
+
+#商品: time-->order. 中间有休息
+t2order_com = calc_t2order(859,1500)
 

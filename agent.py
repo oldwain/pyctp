@@ -623,6 +623,7 @@ class c_instrument(object):
         #其中tdata.m1/m3/m5/m15/m30/d1为不同周期的数据
         #   tdata.cur_min是当前分钟的行情，包括开盘,最高,最低,当前价格,持仓,累计成交量
         #   tdata.cur_day是当日的行情，包括开盘,最高,最低,当前价格,持仓,累计成交量, 其中最高/最低有两类，一者是tick的当前价集合得到的，一者是tick中的最高/最低价得到的
+        self.t2order = t2order_if if hreader.is_if(self.name) else t2order_com
         self.data = BaseObject()
 
     def initialize_positions(self): #根据策略初始化头寸为0
@@ -641,7 +642,10 @@ class c_instrument(object):
             返回的保证金以1为单位
         '''
         my_marginrate = self.marginrate[0] if direction == LONG else self.marginrate[1]
-        return price / 10.0 * self.multiple * my_marginrate 
+        if self.name[:2].upper == 'IF':
+            return price / 10.0 * self.multiple * my_marginrate 
+        else:
+            return price * self.multiple * my_marginrate 
 
     def make_target_price(self,price,direction): 
         '''
@@ -651,6 +655,8 @@ class c_instrument(object):
         '''
         return (price + SLIPPAGE_BASE * self.tick_base if direction == LONG else price-SLIPPAGE_BASE * self.tick_base)/10.0
 
+    def get_order(self,vtime):
+        return self.t2order[vtime]
 
 class AbsAgent(object):
     ''' 抽取与交易无关的功能，便于单独测试
@@ -868,35 +874,46 @@ class Agent(AbsAgent):
         inst = ctick.instrument
         if inst not in self.instruments:
             logger.info(u'接收到未订阅的合约数据:%s' % (inst,))
-        dinst = self.instruments[inst].data
+        dinst = self.instruments[inst]#.data
         if(self.prepare_base(dinst,ctick)):  #如果切分分钟则返回>0
             for func in self.data_funcs:    #动态计算
-                func.func1(dinst)
+                func.func1(dinst.data)
 
     def day_finalize(self,dinst,last_min,last_sec,save_flag=True):
-        '''指定dinst的日结操作
+        '''指定ddata的日结操作
            将当日数据复制到history.txt 
         '''
-        #print dinst.name,last_min,last_sec
-        if dinst.cur_min.vtime > last_min:  #存在151500或150000,不需要继续转换
-            print u'%s存在151500或150000,dinst.cur_min=%s,last_min=%s' % (dinst.name,dinst.cur_min.vtime,last_min)
-            self.logger.info(u'%s存在151500或150000,dinst.cur_min=%s,last_min=%s' % (dinst.name,dinst.cur_min,last_min))
+        #print ddata.name,last_min,last_sec
+        ddata = dinst.data
+        '''
+        if ddata.cur_min.vtime > last_min:  #存在151500或150000,不需要继续转换
+            print u'%s存在151500或150000,ddata.cur_min=%s,last_min=%s' % (ddata.name,ddata.cur_min.vtime,last_min)
+            self.logger.info(u'%s存在151500或150000,ddata.cur_min=%s,last_min=%s' % (ddata.name,ddata.cur_min,last_min))
         else:   #不存在151500或150000.则将最后一分钟保存
             self.save_min(dinst,save_flag)
-        hreader.check_merge(dinst.name)
+        '''
+        last_current_time = hreader.read_current_last(dinst.name).time
+        print 'time:',last_current_time,last_min
+        if last_current_time < last_min:    #如果已经有当分钟的记录，就不再需要保存了。
+            self.save_min(dinst,save_flag)  
+        print 'in day_finalize'
+        hreader.check_merge(ddata.name)
 
     def save_min(self,dinst,save_flag=True):
-        dinst.sdate.append(dinst.cur_min.vdate)
-        dinst.stime.append(dinst.cur_min.vtime)
-        dinst.sopen.append(dinst.cur_min.vopen)
-        dinst.sclose.append(dinst.cur_min.vclose)
-        dinst.shigh.append(dinst.cur_min.vhigh)
-        dinst.slow.append(dinst.cur_min.vlow)
-        dinst.sholding.append(dinst.cur_min.vholding)
-        dinst.svolume.append(dinst.cur_min.vvolume)
+        ddata = dinst.data
+        ddata.sdate.append(ddata.cur_min.vdate)
+        ddata.stime.append(ddata.cur_min.vtime)
+        ddata.sopen.append(ddata.cur_min.vopen)
+        ddata.sclose.append(ddata.cur_min.vclose)
+        ddata.shigh.append(ddata.cur_min.vhigh)
+        ddata.slow.append(ddata.cur_min.vlow)
+        ddata.sholding.append(ddata.cur_min.vholding)
+        ddata.svolume.append(ddata.cur_min.vvolume)
+        ddata.siorder.append(dinst.get_order(ddata.cur_min.vtime))
+        print 'in save_min'
         ##需要save下
         if save_flag == True:
-            hreader.save1(dinst.name,dinst.cur_min)
+            hreader.save1(dinst.name,ddata.cur_min)
 
     def prepare_base(self,dinst,ctick,save_flag=False):
         '''
@@ -904,61 +921,73 @@ class Agent(AbsAgent):
             这里没有处理15:00:00的问题
         '''
         rev = False #默认不切换
-        if ctick.min1 != dinst.cur_min.vtime or ctick.date != dinst.cur_min.vdate:#时间切换
+        ctick.iorder = dinst.get_order(ctick.min1)
+        ddata = dinst.data
+        if (ctick.iorder == ddata.cur_min.viorder + 1 and (ctick.sec > 0 or ctick.msec>0)) or ctick.iorder > ddata.cur_min.viorder + 1 or ctick.date > ddata.cur_min.vdate:#时间切换. 00秒00毫秒属于上一分钟, 但如果下一单是隔了n分钟的，也直接切换
             rev = True
-            #print ctick.min1,dinst.cur_min.vtime,ctick.date,dinst.cur_min.vdate
-            if (len(dinst.stime)>0 and (ctick.date > dinst.sdate[-1] or ctick.min1 > dinst.stime[-1])) or len(dinst.stime)==0:#已有分钟与已保存的有差别
-                #这里把00秒归入到新的分钟里面
+            #print ctick.min1,ddata.cur_min.vtime,ctick.date,ddata.cur_min.vdate
+            if (len(ddata.stime)>0 and (ctick.date > ddata.sdate[-1] or ctick.min1 > ddata.stime[-1])) or len(ddata.stime)==0:#已有分钟与已保存的有差别
+                ''' #2011-05-01 去掉. 因为把00归入上一分钟
+                #这里把00秒归入到新的分钟里面. todo:需要把00归入到老的分钟??一切都迎刃而解
                 if (hreader.is_if(ctick.instrument) and ctick.min1 == 1515 and ctick.sec==0) or (not hreader.is_if(ctick.instrument) and ctick.min1 == 1500 and ctick.sec==0): #最后一秒钟算1514/1500的, 需要处理没有1500/1515时候的最后一分钟
                     print u'最后一秒钟....'
-                    dinst.cur_min.vclose = ctick.price
-                    if ctick.price > dinst.cur_min.vhigh:
-                        dinst.cur_min.vhigh = ctick.price
-                    if ctick.price < dinst.cur_min.vlow:
-                        dinst.cur_min.vlow = ctick.price
-                    dinst.cur_min.vholding = ctick.holding
-                    dinst.cur_min.vvolume += (ctick.dvolume - dinst.cur_day.vvolume)
-                if dinst.cur_min.vdate != 0:    #不是史上第一个
+                    ddata.cur_min.vclose = ctick.price
+                    if ctick.price > ddata.cur_min.vhigh:
+                        ddata.cur_min.vhigh = ctick.price
+                    if ctick.price < ddata.cur_min.vlow:
+                        ddata.cur_min.vlow = ctick.price
+                    ddata.cur_min.vholding = ctick.holding
+                    ddata.cur_min.vvolume += (ctick.dvolume - ddata.cur_day.vvolume)
+                '''
+                if ddata.cur_min.vdate != 0:    #不是史上第一个
                     print u'正常保存分钟数据.......'
-                    self.save_min(dinst,save_flag)
-                else:#是史上第一个，之前的cur_min是默认值
-                    print u'不保存分钟数据,date=%s' % (dinst.cur_min.vdate)
+                    self.save_min(ddata,save_flag)
+                else:#是史上第一分钟，之前的cur_min是默认值, 即无保存价值
+                    print u'不保存分钟数据,date=%s' % (ddata.cur_min.vdate)
                     rev = False
-            dinst.cur_min.vdate = ctick.date
-            dinst.cur_min.vtime = ctick.min1
-            dinst.cur_min.vopen = ctick.price
-            dinst.cur_min.vclose = ctick.price
-            dinst.cur_min.vhigh = ctick.price
-            dinst.cur_min.vlow = ctick.price
-            dinst.cur_min.vholding = ctick.holding
-            dinst.cur_min.vvolume = ctick.dvolume - dinst.cur_day.vvolume if ctick.date == dinst.cur_day.vdate else ctick.dvolume
-        else:#当分钟的处理
-            dinst.cur_min.vclose = ctick.price
-            if ctick.price > dinst.cur_min.vhigh:
-                dinst.cur_min.vhigh = ctick.price
-            if ctick.price < dinst.cur_min.vlow:
-                dinst.cur_min.vlow = ctick.price
-            dinst.cur_min.vholding = ctick.holding
-            dinst.cur_min.vvolume += (ctick.dvolume - dinst.cur_day.vvolume)
+            ddata.cur_min.vdate = ctick.date
+            ddata.cur_min.vtime = ctick.min1
+            ddata.cur_min.vopen = ctick.price
+            ddata.cur_min.vclose = ctick.price
+            ddata.cur_min.vhigh = ctick.price
+            ddata.cur_min.vlow = ctick.price
+            ddata.cur_min.vholding = ctick.holding
+            ddata.cur_min.vvolume = ctick.dvolume - ddata.cur_day.vvolume if ctick.date == ddata.cur_day.vdate else ctick.dvolume
+            ddata.cur_min.viorder = ctick.iorder
+            print 'in change:',ddata.cur_min.vvolume
+        elif ctick.iorder == ddata.cur_min.viorder or (ctick.iorder == ddata.cur_min.viorder + 1 and ctick.sec == 0 and ctick.msec==0):#当分钟的处理. 在接续时，如果resume时间正好是当分钟，会发生当分钟重复计数
+            print ddata.cur_min.vvolume,ctick.dvolume,ddata.cur_day.vvolume,ctick.time,ctick.sec,ctick.msec
+            ddata.cur_min.vclose = ctick.price
+            if ctick.price > ddata.cur_min.vhigh:
+                ddata.cur_min.vhigh = ctick.price
+            if ctick.price < ddata.cur_min.vlow:
+                ddata.cur_min.vlow = ctick.price
+            ddata.cur_min.vholding = ctick.holding
+            ddata.cur_min.vvolume += (ctick.dvolume - ddata.cur_day.vvolume)
+            print ddata.cur_min.vvolume
+        else:#早先的tick，只在测试时用到
+            pass
         ##日的处理
-        if ctick.date != dinst.cur_day.vdate:
-            dinst.cur_day.vdate = ctick.date
-            dinst.cur_day.vopen = ctick.price
-            dinst.cur_day.vhigh = ctick.price
-            dinst.cur_day.vlow = ctick.price
+        if ctick.date != ddata.cur_day.vdate:
+            ddata.cur_day.vdate = ctick.date
+            ddata.cur_day.vopen = ctick.price
+            ddata.cur_day.vhigh = ctick.price
+            ddata.cur_day.vlow = ctick.price
         else:
-            if ctick.price > dinst.cur_day.vhigh:
-                dinst.cur_day.vhigh = ctick.price   #根据当前价比较得到的最大/最小
-            if ctick.price < dinst.cur_day.vlow:
-                dinst.cur_day.vlow = ctick.price
-        dinst.cur_day.vholding = ctick.holding
-        dinst.cur_day.vvolume = ctick.dvolume
-        dinst.cur_day.vhighd = ctick.high   #服务器传过来的最大/最小
-        dinst.cur_day.vlowd = ctick.low
-        dinst.cur_day.vclose = ctick.price
-        if (hreader.is_if(ctick.instrument) and ctick.min1 == 1514 and ctick.sec==59) or (not hreader.is_if(ctick.instrument) and ctick.min1 == 1459 and ctick.sec==59): #
-            threading.Timer(30,self.day_finalize,args=[dinst,ctick.min1,ctick.sec,save_flag]).start()
-            self.day_finalize(dinst)
+            if ctick.price > ddata.cur_day.vhigh:
+                ddata.cur_day.vhigh = ctick.price   #根据当前价比较得到的最大/最小
+            if ctick.price < ddata.cur_day.vlow:
+                ddata.cur_day.vlow = ctick.price
+        ddata.cur_day.vholding = ctick.holding
+        ddata.cur_day.vvolume = ctick.dvolume
+        ddata.cur_day.vhighd = ctick.high   #服务器传过来的最大/最小
+        ddata.cur_day.vlowd = ctick.low
+        ddata.cur_day.vclose = ctick.price
+        #if (hreader.is_if(ctick.instrument) and ctick.min1 == 1514 and ctick.sec==59) or (not hreader.is_if(ctick.instrument) and ctick.min1 == 1459 and ctick.sec==59): #收盘作业
+        if ddata.cur_min.viorder == 270 and ctick.sec == 59 and ctick.min1 >=ddata.cur_min.vtime: #避免收到历史行情引发问题
+            #print 'in closing',ddata.cur_min.viorder,ctick.sec,ddata.cur_min.vtime,ctick.min1
+            threading.Timer(1,self.day_finalize,args=[dinst,ctick.min1,ctick.sec,save_flag]).start()
+            #self.day_finalize(dinst,ctick.min1,ctick.sec,save_flag)
         #threading.Timer(3,self.day_finalize,args=[dinst,ctick.min1,ctick.sec,save_flag]).start()
         return rev
     
@@ -1311,7 +1340,7 @@ class SaveAgent(Agent):
         inst = ctick.instrument
         if inst not in self.instruments:
             logger.info(u'接收到未订阅的合约数据:%s' % (inst,))
-        dinst = self.instruments[inst].data
+        dinst = self.instruments[inst]#.data
         self.prepare_base(dinst,ctick,save_flag=True)  
     
     def rsp_qry_instrument(self,pinstrument):

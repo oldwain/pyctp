@@ -54,16 +54,16 @@ def read_records(data,extractor):
                 records.append(record)
     return records
 
-def read_min_as_list(filename,length,extractor=extract_std,readfunc = read_data):
+def read_min_as_list(filename,length,extractor=extract_std,readfunc = read_data,t2order=t2order_if):
     try:
         records = readfunc(filename,extractor)
     except Exception,inst:#读不到数据,默认都为1(避免出现被0除)
         logger.error(u'文件打开错误，文件名=%s,错误信息=%s' % (filename,str(inst)))
         n = 0
-        return [[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n]
+        return [[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n]
     else:   #正常读取到数据
         n = min(len(records),length)
-        tran_data = [[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n]
+        tran_data = [[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n]
         i = 0
         for record in records[-length:]:
             tran_data[IDATE][i] = record.date
@@ -74,6 +74,7 @@ def read_min_as_list(filename,length,extractor=extract_std,readfunc = read_data)
             tran_data[ILOW][i] = record.low       
             tran_data[IVOL][i] = record.vol
             tran_data[IHOLDING][i] = record.holding
+            tran_data[IORDER][i] = t2order[record.time]
             i += 1
     return tran_data
 
@@ -96,9 +97,9 @@ def read_last_record(filename,extractor=extract_std,readfunc = read_data):
 
 
 def concatenate(*args):
-    result =  [[],[],[],[],[],[],[],[]]
+    result =  [[],[],[],[],[],[],[],[],[]]
     for arg in args:
-        for i in range(8):
+        for i in range(9):
             result[i] += arg[i]
     return result
 
@@ -124,15 +125,28 @@ def make_tick_filename(instrument,tday=0,suffix='txt'):
 def make_min_filename(instrument,path=DATA_PATH,suffix='txt'):
     return '%s%s/%s_min.%s' % (path,instrument,time.strftime('%Y%m%d'),suffix)
 
+def make_min_filename_c(instrument,tday,path=DATA_PATH,suffix='txt'):   #根据指定的日期加载
+    return '%s%s/%s_min.%s' % (path,instrument,tday,suffix)
 
 make_his_filename = lambda name,path=DATA_PATH:'%s%s/%s' % (path,name,HISTORY_TXT)
 
 def read1(instrument,length=6000,path=DATA_PATH,extractor=extract_std,readfunc=read_data):
     #6000是22天，足够应付日ATR计算
-    dhistory = read_min_as_list(make_his_filename(instrument,path),length=length,extractor=extractor,readfunc=readfunc)
-    dtoday = read_min_as_list(make_min_filename(instrument,path),length=length,extractor=extractor,readfunc=readfunc)
-    hdata = BaseObject(name=instrument,instrument=instrument,transaction=concatenate(dhistory+dtoday))
+    t2order = t2order_if if is_if(instrument) else t2order_com
+    dhistory = read_min_as_list(make_his_filename(instrument,path),length=length,extractor=extractor,readfunc=readfunc,t2order=t2order)
+    dtoday = read_min_as_list(make_min_filename(instrument,path),length=length,extractor=extractor,readfunc=readfunc,t2order=t2order)
+    hdata = BaseObject(name=instrument,instrument=instrument,transaction=concatenate(dhistory,dtoday))
     return hdata
+
+def read1m(instrument,tday,length=6000,path=DATA_PATH,extractor=extract_std,readfunc=read_data):
+    #用于mock
+    #6000是22天，足够应付日ATR计算
+    t2order = t2order_if if is_if(instrument) else t2order_com
+    dhistory = read_min_as_list(make_his_filename(instrument,path),length=length,extractor=extractor,readfunc=readfunc,t2order=t2order)
+    dtoday = read_min_as_list(make_min_filename_c(instrument,tday,path),length=length,extractor=extractor,readfunc=readfunc,t2order=t2order)
+    hdata = BaseObject(name=instrument,instrument=instrument,transaction=concatenate(dhistory,dtoday))
+    return hdata,dhistory,dtoday
+
 
 #不从zip读数据
 #read1_zip = fcustom(read1,readfunc=read_data_zip)
@@ -141,16 +155,28 @@ def read1(instrument,length=6000,path=DATA_PATH,extractor=extract_std,readfunc=r
 def read_history(instrument_id,path):
     return read1(instrument_id,path=path)
 
+def read_history_c(instrument_id,tday,path):#指定当前日，用于测试
+    return read1(instrument_id,tday,path=path)
+
+
 def read_history_last(instrument_id,path=DATA_PATH):
     return read_last_record(make_his_filename(instrument_id,path))
+
+def read_current_last(instrument_id,path=DATA_PATH):
+    return read_last_record(make_min_filename(instrument_id,path))
+
 
 
 ##检查是否需要合并历史数据和当日数据，如果需要则合并
 def check_merge(instrument_id,path=DATA_PATH):
+    ##todo:这里应该加个锁
     last_history_date = read_history_last(instrument_id).date
-    cur_date = int(time.strftime('%Y%m%d'))
-    print cur_date,last_history_date
-    if cur_date > last_history_date:    #只有当日大于最后历史日时，才需要合并
+    last_current_date = read_current_last(instrument_id).date
+    #cur_date = int(time.strftime('%Y%m%d'))
+    #print 'in check_merge',cur_date,last_history_date
+    print 'in check_merge',last_current_date,last_history_date
+    #if cur_date > last_history_date:    #只有当日大于最后历史日时，才需要合并
+    if last_current_date > last_history_date:    #只有当日大于最后历史日时，才需要合并
         cur_file = make_min_filename(instrument_id,path)
         his_file = make_his_filename(instrument_id,path)
         try:
@@ -162,8 +188,10 @@ def check_merge(instrument_id,path=DATA_PATH):
             cf.close()
         return True
     else:
-        print u'不需要合并,instrument_id=%s 最后日=%s,当前日=%s' % (instrument_id,last_history_date,cur_date)
-        logger.debug(u'不需要合并, instrument=%s,最后日=%s,当前日=%s' % (instrument_id,last_history_date,cur_date))
+        #print u'不需要合并,instrument_id=%s 最后日=%s,当前日=%s' % (instrument_id,last_history_date,cur_date)
+        #logger.debug(u'不需要合并, instrument=%s,最后日=%s,当前日=%s' % (instrument_id,last_history_date,cur_date))
+        print u'不需要合并,instrument_id=%s 最后日=%s,当前日=%s' % (instrument_id,last_history_date,last_current_date)
+        logger.debug(u'不需要合并, instrument=%s,最后日=%s,当前日=%s' % (instrument_id,last_history_date,last_current_date))
         return False
 
 #####################################################
@@ -186,10 +214,7 @@ def save1(instrument,min_data,path=DATA_PATH):
 def prepare_data(instruments,path=DATA_PATH):
     data = {}
     for inst in instruments:
-        if inst[:2] == 'IF' or inst[:2] == 'if':
-            PREPARER = IF_PREPARER
-        else:
-            PREPARER = CM_PREPARER
+        PREPARER = PREPARER_INST
         tdata = read_history(inst,path)
         tdata.m1 = tdata.transaction
         ###基本序列按1分钟设定,方便快捷查找
@@ -201,17 +226,18 @@ def prepare_data(instruments,path=DATA_PATH):
         tdata.slow = tdata.m1[ILOW]
         tdata.svolume = tdata.m1[IVOL]
         tdata.sholding = tdata.m1[IHOLDING]
+        tdata.siorder = tdata.m1[IORDER]
         ###其它周期
-        oc_index_3 = PREPARER.p3(tdata.transaction[ITIME])
+        oc_index_3 = PREPARER.p3(tdata.transaction[IORDER])
         tdata.m3 = compress(tdata.transaction,oc_index_3)
-        oc_index_5 = PREPARER.p5(tdata.transaction[ITIME])
+        oc_index_5 = PREPARER.p5(tdata.transaction[IORDER])
         tdata.m5 = compress(tdata.transaction,oc_index_5)
-        oc_index_15 = PREPARER.p15(tdata.transaction[ITIME])
+        oc_index_15 = PREPARER.p15(tdata.transaction[IORDER])
         tdata.m15 = compress(tdata.transaction,oc_index_15)
-        oc_index_30 = PREPARER.p30(tdata.transaction[ITIME])
+        oc_index_30 = PREPARER.p30(tdata.transaction[IORDER])
         tdata.m30 = compress(tdata.transaction,oc_index_30)
         data[inst] = tdata
-        oc_index_d = PREPARER.pd(tdata.transaction[ITIME])
+        oc_index_d = PREPARER.pd(tdata.transaction[IORDER])
         tdata.d1 = compress(tdata.transaction,oc_index_d)
         if len(tdata.d1[IDATE])>0:
             tdata.cur_day = BaseObject(
@@ -249,6 +275,7 @@ def prepare_data(instruments,path=DATA_PATH):
                         vlow = tdata.slow[-1],
                         vholding = tdata.sholding[-1],
                         vvolume = tdata.svolume[-1],
+                        viorder = tdata.siorder[-1],
                     )
         else:
             tdata.cur_min = BaseObject(
@@ -260,6 +287,7 @@ def prepare_data(instruments,path=DATA_PATH):
                         vlow = 0,
                         vholding = 0,
                         vvolume = 0,
+                        viorder=0,
                     )
         data[inst] = tdata
     return data
@@ -269,7 +297,7 @@ def compress(trans_data,oc_index):
         将trans_data的各数据根据oc_index压缩成相应的X分钟数据
     '''
     n = len(oc_index)
-    xdata = [[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,]
+    xdata = [[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n]
     xdata[IDATE] = [trans_data[IDATE][c] for o,c in oc_index]
     xdata[ITIME] = [trans_data[ITIME][c] for o,c in oc_index]   #收盘时间点
     xdata[IOPEN] = [trans_data[IOPEN][o] for o,c in oc_index]        
@@ -278,9 +306,11 @@ def compress(trans_data,oc_index):
     xdata[ILOW] = [min(trans_data[ILOW][o:c+1]) for o,c in oc_index]
     xdata[IVOL] = [sum(trans_data[IVOL][o:c+1]) for o,c in oc_index]
     xdata[IHOLDING] = [trans_data[IHOLDING][c] for o,c in oc_index]
+    xdata[IORDER] = [trans_data[IORDER][c] for o,c in oc_index]
     return xdata
 
 
+'''
 ##是否是IF的X分钟收盘分钟
 IF_XPREPARER = BaseObject()
 IF_XPREPARER.ISEND_3 = lambda x:(x%100%3==2 or x%10000==1514) and x%1000!=914
@@ -296,9 +326,19 @@ CM_XPREPARER.ISEND_5 = lambda x: x%5==4 and x%1000!=859
 CM_XPREPARER.ISEND_15 = lambda x:x%100%15 == 14 and x%1000!=859
 CM_XPREPARER.ISEND_30 = lambda x:(x%100%30 == 29 or x%10000 == 1014) and x%1000!=859
 CM_XPREPARER.ISEND_DAY = lambda x:x%10000 == 1459
+'''
+
+#通用的Preparer
+SPREPARER = BaseObject()
+SPREPARER.ISEND_3 = lambda x:x%3==2 and x>0
+SPREPARER.ISEND_5 = lambda x: x%5==4 and x>0
+SPREPARER.ISEND_15 = lambda x:x%15 == 14 and x>0
+SPREPARER.ISEND_30 = lambda x:x%30 == 29 and x>0
+SPREPARER.ISEND_DAY = lambda x:x == 270
+
 
 def is_if(instrument):#判断是否是IF
-    return instrument[:2] == 'IF'
+    return instrument[:2].upper() == 'IF'
 
 class XPREPARER(object):
     def __init__(self,fpreparer):
@@ -334,8 +374,11 @@ class XPREPARER(object):
         oposs = [c+1 if c-1>0 else 0 for c in cposs] #close
         return zip(oposs,cposs[1:])
 
+'''
 IF_PREPARER = XPREPARER(IF_XPREPARER)
 CM_PREPARER = XPREPARER(CM_XPREPARER)
+'''
+PREPARER_INST= XPREPARER(SPREPARER)
 
 ##############################################
 ##ticks数据读取
@@ -377,28 +420,29 @@ def time_period_switch(data):
     #if(len(data.sdate) == 0):   #该合约史上第一分钟,不引起切换. 这个在外部保障
     #    return
     assert len(data.sdate)>0
-    fpreparer = IF_XPREPARER if is_if(data.instrument) else CM_XPREPARER
-    if fpreparer.ISEND_3(data.stime[-1]) and (len(data.m3[IDATE])==0 
+    #fpreparer = IF_XPREPARER if is_if(data.instrument) else CM_XPREPARER
+    fpreparer = SPREPARER
+    if fpreparer.ISEND_3(data.siorder[-1]) and (len(data.m3[IDATE])==0 
                                         or data.sdate[-1] > data.m3[IDATE][-1] 
                                         or data.stime[-1] > data.m3[ITIME][-1]
                                     ):#添加新的3分钟
         append1(data.m3,data,3)
-    if fpreparer.ISEND_5(data.stime[-1]) and (len(data.m5[IDATE])==0 
+    if fpreparer.ISEND_5(data.siorder[-1]) and (len(data.m5[IDATE])==0 
                                         or data.sdate[-1] > data.m5[IDATE][-1] 
                                         or data.stime[-1] > data.m5[ITIME][-1]
                                     ):#添加新的5分钟
         append1(data.m5,data,5)
-    if fpreparer.ISEND_15(data.stime[-1]) and (len(data.m15[IDATE])==0 
+    if fpreparer.ISEND_15(data.siorder[-1]) and (len(data.m15[IDATE])==0 
                                         or data.sdate[-1] > data.m15[IDATE][-1] 
                                         or data.stime[-1] > data.m15[ITIME][-1]
                                     ):#添加新的15分钟
         append1(data.m15,data,15)
-    if fpreparer.ISEND_30(data.stime[-1]) and (len(data.m30[IDATE])==0 
+    if fpreparer.ISEND_30(data.siorder[-1]) and (len(data.m30[IDATE])==0 
                                         or data.sdate[-1] > data.m30[IDATE][-1] 
                                         or data.stime[-1] > data.m30[ITIME][-1]
                                     ):#添加新的30分钟
         append1(data.m30,data,30)
-    if fpreparer.ISEND_DAY(data.stime[-1]) and (len(data.d1[IDATE])==0 
+    if fpreparer.ISEND_DAY(data.siorder[-1]) and (len(data.d1[IDATE])==0 
                                         or data.sdate[-1] > data.d1[IDATE][-1] 
                                     ):#添加新的日数据
         append1(data.m15,data,270)
@@ -416,4 +460,4 @@ def append1(xdata,data1,length):
     xdata[ILOW].append(min(data1.slow[-mlen:]))
     xdata[IVOL].append(sum(data1.svolume[-mlen:]))
     xdata[IHOLDING].append(data1.sholding[-1])
-
+    xdata[IORDER].append(data1.siorder[-1])
