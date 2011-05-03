@@ -138,7 +138,7 @@ def read1(instrument,length=6000,path=DATA_PATH,extractor=extract_std,readfunc=r
     hdata = BaseObject(name=instrument,instrument=instrument,transaction=concatenate(dhistory,dtoday))
     return hdata
 
-def read1m(instrument,tday,length=6000,path=DATA_PATH,extractor=extract_std,readfunc=read_data):
+def read1_c(instrument,tday,length=6000,path=DATA_PATH,extractor=extract_std,readfunc=read_data):
     #用于mock
     #6000是22天，足够应付日ATR计算
     t2order = t2order_if if is_if(instrument) else t2order_com
@@ -156,7 +156,7 @@ def read_history(instrument_id,path):
     return read1(instrument_id,path=path)
 
 def read_history_c(instrument_id,tday,path):#指定当前日，用于测试
-    return read1m(instrument_id,tday=tday,path=path)
+    return read1_c(instrument_id,tday=tday,path=path)
 
 def read_history_last(instrument_id,path=DATA_PATH):
     return read_last_record(make_his_filename(instrument_id,path))
@@ -164,19 +164,21 @@ def read_history_last(instrument_id,path=DATA_PATH):
 def read_current_last(instrument_id,path=DATA_PATH):
     return read_last_record(make_min_filename(instrument_id,path))
 
+def read_current_last_c(instrument_id,tday,path=DATA_PATH):
+    return read_last_record(make_min_filename_c(instrument_id,tday,path))
 
 
 ##检查是否需要合并历史数据和当日数据，如果需要则合并
-def check_merge(instrument_id,path=DATA_PATH):
+def check_merge(instrument_id,tday,path=DATA_PATH):
     ##todo:这里应该加个锁
     last_history_date = read_history_last(instrument_id).date
-    last_current_date = read_current_last(instrument_id).date
+    last_current_date = read_current_last_c(instrument_id,tday).date
     #cur_date = int(time.strftime('%Y%m%d'))
     #print 'in check_merge',cur_date,last_history_date
     print 'in check_merge',last_current_date,last_history_date
     #if cur_date > last_history_date:    #只有当日大于最后历史日时，才需要合并
     if last_current_date > last_history_date:    #只有当日大于最后历史日时，才需要合并
-        cur_file = make_min_filename(instrument_id,path)
+        cur_file = make_min_filename_c(instrument_id,tday,path)
         his_file = make_his_filename(instrument_id,path)
         try:
             hf = open(his_file,'a+')
@@ -199,8 +201,8 @@ def check_merge(instrument_id,path=DATA_PATH):
 def i2s(iv):    #将.1转化为正常点. 以与从文化财经保存的一致
     return '%s.%s' % (iv/10,iv%10)
 
-def save1(instrument,min_data,path=DATA_PATH):
-    filename = make_min_filename(instrument,path)
+def save1(instrument,min_data,tday,path=DATA_PATH):
+    filename = make_min_filename_c(instrument,tday,path)
     ff = open(filename,'a+')
     sdate = '%s/%02d/%02d' % (min_data.vdate/10000,min_data.vdate/100%100,min_data.vdate%100)
     stime = '%02d:%02d' % (min_data.vtime/100,min_data.vtime%100)
