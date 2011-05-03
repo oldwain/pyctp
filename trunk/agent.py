@@ -713,7 +713,6 @@ class Agent(AbsAgent):
         self.data_funcs = []  #计算函数集合. 如计算各类指标, 顺序关系非常重要
                               #每一类函数由一对函数组成，.sfunc计算序列用，.func1为动态计算用，只计算当前值
                               #接口为(data), 从data的属性中取数据,并计算另外一些属性
-                              #顺序关系非常重要，否则可能会紊乱
         ###交易
         self.lastupdate = 0
         self.transmitting_orders = {}    #orderref==>order,发出后等待回报的指令, 回报后到holding
@@ -743,6 +742,13 @@ class Agent(AbsAgent):
         self.scheduler = sched.scheduler(time.time, time.sleep)
         #保存锁
         self.lock = threading.Lock()
+        #保存分钟数据标志
+        self.save_flag = False  #默认不保存
+
+        self.init_init()    #init中的init,用于子类的处理
+
+    def init_init(self):
+        pass
 
     def set_spi(self,spi):
         self.spi = spi
@@ -883,7 +889,7 @@ class Agent(AbsAgent):
             for func in self.data_funcs:    #动态计算
                 func.func1(dinst.data)
 
-    def day_finalize(self,dinst,last_min,last_sec,save_flag=True):
+    def day_finalize(self,dinst,last_min,last_sec):
         '''指定ddata的日结操作
            将当日数据复制到history.txt 
         '''
@@ -895,16 +901,16 @@ class Agent(AbsAgent):
                 print u'%s存在151500或150000,ddata.cur_min=%s,last_min=%s' % (ddata.name,ddata.cur_min.vtime,last_min)
                 self.logger.info(u'%s存在151500或150000,ddata.cur_min=%s,last_min=%s' % (ddata.name,ddata.cur_min,last_min))
             else:   #不存在151500或150000.则将最后一分钟保存
-                self.save_min(dinst,save_flag)
+                self.save_min(dinst)
             '''
             last_current_time = hreader.read_current_last(dinst.name).time
             print 'time:',last_current_time,last_min
             if last_current_time < last_min:    #如果已经有当分钟的记录，就不再需要保存了。
-                self.save_min(dinst,save_flag)  
+                self.save_min(dinst)  
             #print 'in day_finalize'
-            hreader.check_merge(ddata.name)
+            hreader.check_merge(ddata.name,self.scur_day)
 
-    def save_min(self,dinst,save_flag=True):
+    def save_min(self,dinst):
         ddata = dinst.data
         ddata.sdate.append(ddata.cur_min.vdate)
         ddata.stime.append(ddata.cur_min.vtime)
@@ -917,10 +923,10 @@ class Agent(AbsAgent):
         ddata.siorder.append(dinst.get_order(ddata.cur_min.vtime))
         #print 'in save_min'
         ##需要save下
-        if save_flag == True:
-            hreader.save1(dinst.name,ddata.cur_min)
+        if self.save_flag == True:
+            hreader.save1(dinst.name,ddata.cur_min,self.scur_day)
 
-    def prepare_base(self,dinst,ctick,save_flag=False):
+    def prepare_base(self,dinst,ctick):
         '''
             返回值标示是否是分钟的切换
             这里没有处理15:00:00的问题
@@ -946,13 +952,13 @@ class Agent(AbsAgent):
                 '''
                 #if ddata.cur_min.vdate != 0:    #不是史上第一个
                 #    #print u'正常保存分钟数据.......'
-                #    self.save_min(dinst,save_flag)
+                #    self.save_min(dinst)
                 #else:#是史上第一分钟，之前的cur_min是默认值, 即无保存价值
                 #    #print u'不保存分钟数据,date=%s' % (ddata.cur_min.vdate)
                 #    rev = False
                 if dinst.begin_flag:
                     #print u'保存分钟数据,date=%s,time=%s' % (ddata.cur_min.vdate,ddata.cur_min.vtime)
-                    self.save_min(dinst,save_flag)
+                    self.save_min(dinst)
                 else:
                     #print u'第-1分钟数据不保存,date=%s,time=%s' % (ddata.cur_min.vdate,ddata.cur_min.vtime)
                     dinst.begin_flag = True
@@ -998,9 +1004,9 @@ class Agent(AbsAgent):
         #if (hreader.is_if(ctick.instrument) and ctick.min1 == 1514 and ctick.sec==59) or (not hreader.is_if(ctick.instrument) and ctick.min1 == 1459 and ctick.sec==59): #收盘作业
         if ddata.cur_min.viorder == 270 and ctick.sec == 59 and ctick.min1 >=ddata.cur_min.vtime: #避免收到历史行情引发问题
             #print 'in closing',ddata.cur_min.viorder,ctick.sec,ddata.cur_min.vtime,ctick.min1
-            threading.Timer(1,self.day_finalize,args=[dinst,ctick.min1,ctick.sec,save_flag]).start()
-            #self.day_finalize(dinst,ctick.min1,ctick.sec,save_flag)
-        #threading.Timer(3,self.day_finalize,args=[dinst,ctick.min1,ctick.sec,save_flag]).start()
+            threading.Timer(1,self.day_finalize,args=[dinst,ctick.min1,ctick.sec]).start()
+            #self.day_finalize(dinst,ctick.min1,ctick.sec)
+        #threading.Timer(3,self.day_finalize,args=[dinst,ctick.min1,ctick.sec]).start()
         return rev
     
     def check_close_signal(self,ctick):
@@ -1348,12 +1354,16 @@ class Agent(AbsAgent):
 
 
 class SaveAgent(Agent):
+    def init_init(self):
+        Agent.init_init(self)
+        self.save_flag = True
+
     def RtnTick(self,ctick):#行情处理主循环
         inst = ctick.instrument
         if inst not in self.instruments:
             logger.info(u'接收到未订阅的合约数据:%s' % (inst,))
         dinst = self.instruments[inst]#.data
-        self.prepare_base(dinst,ctick,save_flag=True)  
+        self.prepare_base(dinst,ctick)  
     
     def rsp_qry_instrument(self,pinstrument):
         '''
