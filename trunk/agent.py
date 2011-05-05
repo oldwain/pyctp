@@ -150,6 +150,7 @@ from MdApi import MdApi, MdSpi
 from TraderApi import TraderApi, TraderSpi  
 
 import config
+import strategy
 
 #数据定义中唯一一个enum
 THOST_TERT_RESTART  = 0
@@ -591,13 +592,14 @@ class c_instrument(object):
            [总最大持仓量,策略1,策略2...] 
         '''
         objs = dict([(name,c_instrument(name)) for name in names])
-        for name,item in strategy:
-            if name not in objs:
-                print u'策略针对合约%s不在盯盘列表中' % (name,)
+        for item in strategy.values():
+            if item.name not in objs:
+                print u'策略针对合约%s不在盯盘列表中' % (item.name,)
                 continue
-            objs[name].max_volume = item[0] #
-            objs[name].strategy = dict([(ss.get_name(),ss) for ss in item[1:]])
-            objs[name].initialize_positions()
+            objs[item.name].max_volume = item.max_volume #
+            #objs[item.name].strategy = dict([(ss.get_name(),ss) for ss in item[1:]])
+            objs[item.name].strategy = dict([(name,ss) for ss in item.strategys])
+            objs[item.name].initialize_positions()
         return objs
 
     def __init__(self,name):
@@ -628,7 +630,7 @@ class c_instrument(object):
         self.begin_flag = False #save标志，默认第一个不保存, 因为第一次切换的上一个是历史数据
 
     def initialize_positions(self): #根据策略初始化头寸为0
-        self.position_detail = dict([(ss.get_name(),Position(self.name,ss)) for ss in self.strategy.values()])
+        self.position_detail = dict([(ss.name,strategy.Position(self.name,ss)) for ss in self.strategy.values()])
 
     def calc_remained_volume(self):   #计算剩余的可开仓量
         locked_volume = 0
@@ -747,7 +749,7 @@ class Agent(AbsAgent):
 
         self.init_init()    #init中的init,用于子类的处理
 
-    def init_init(self):
+    def init_init(self):    #init中的init,用于子类的处理
         pass
 
     def set_spi(self,spi):
@@ -862,7 +864,9 @@ class Agent(AbsAgent):
     def RtnTick(self,ctick):#行情处理主循环
         #print u'in my lock, close长度:%s,ma_5长度:%s\n' %(len(self.instrument[ctick.instrument].data.sclose),len(self.instrument[ctick.instrument].data.ma_5))
         inst = ctick.instrument
-        self.prepare_tick(ctick)
+        if not self.prepare_tick(ctick):    #非法ticks数据
+            print 'invalid ticks'
+            return 
         #先平仓
         close_positions = self.check_close_signal(ctick)
         if len(close_positions)>0:
@@ -880,14 +884,21 @@ class Agent(AbsAgent):
     def prepare_tick(self,ctick):
         '''
             准备计算, 包括分钟数据、指标的计算
+            返回值表示该tick数据是否有效
         '''
         inst = ctick.instrument
         if inst not in self.instruments:
             logger.info(u'接收到未订阅的合约数据:%s' % (inst,))
+            return False
         dinst = self.instruments[inst]#.data
+        ctick.iorder = dinst.get_order(ctick.min1)
+        if (ctick.iorder < dinst.data.cur_min.viorder and ctick.date == dinst.data.cur_min.vdate) or ctick.date < dinst.data.cur_min.vdate:
+            #print ctick.date,ctick.time,dinst.data.cur_min.vdate,dinst.data.cur_min.vtime
+            return False
         if(self.prepare_base(dinst,ctick)):  #如果切分分钟则返回>0
             for func in self.data_funcs:    #动态计算
                 func.func1(dinst.data)
+        return True
 
     def day_finalize(self,dinst,last_min,last_sec):
         '''指定ddata的日结操作
@@ -932,7 +943,6 @@ class Agent(AbsAgent):
             这里没有处理15:00:00的问题
         '''
         rev = False #默认不切换
-        ctick.iorder = dinst.get_order(ctick.min1)
         ddata = dinst.data
         if (ctick.iorder == ddata.cur_min.viorder + 1 and (ctick.sec > 0 or ctick.msec>0)) or ctick.iorder > ddata.cur_min.viorder + 1 or ctick.date > ddata.cur_min.vdate:#时间切换. 00秒00毫秒属于上一分钟, 但如果下一单是隔了n分钟的，也直接切换
             rev = True
@@ -1054,6 +1064,7 @@ class Agent(AbsAgent):
                 最大手数
                 基准价
         '''
+        #print 'in check_open_signal'
         signals = []
         if ctick.instrument not in self.instruments:
             self.logger.warning(u'需要监控的%s未记录行情数据')
@@ -1220,7 +1231,6 @@ class Agent(AbsAgent):
                 1. 获得必要的历史数据
                 2. 获得当日分钟数据, 并计算相关指标
                 3. 获得当日持仓，并初始化止损. 
-                暂时要求历史数据和当日已发生的分钟数据保存在一个文件里面整体读取
         '''
         state = config.parse_state(self.strategy)
         cposs = set([])

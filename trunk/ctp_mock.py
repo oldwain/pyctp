@@ -157,10 +157,11 @@ def trade_mock(instrument='IF1104'):
     trader = TraderMock()
     
     strategy_cfg = config.parse_strategy()
- 
+
+    ##这里没有考虑现场恢复，state中需注明当日
     myagent = agent.Agent(trader,None,[instrument],strategy_cfg.strategy) 
 
     ticks = hreader.read_ticks(instrument,20110329)    #不加载当日数据
     for tick in ticks:
-        myagent.agent.RtnTick(tick)
+        myagent.RtnTick(tick)
 
