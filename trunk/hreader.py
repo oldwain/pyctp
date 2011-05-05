@@ -135,7 +135,11 @@ def read1(instrument,length=6000,path=DATA_PATH,extractor=extract_std,readfunc=r
     t2order = t2order_if if is_if(instrument) else t2order_com
     dhistory = read_min_as_list(make_his_filename(instrument,path),length=length,extractor=extractor,readfunc=readfunc,t2order=t2order)
     dtoday = read_min_as_list(make_min_filename(instrument,path),length=length,extractor=extractor,readfunc=readfunc,t2order=t2order)
-    hdata = BaseObject(name=instrument,instrument=instrument,transaction=concatenate(dhistory,dtoday))
+    #hdata = BaseObject(name=instrument,instrument=instrument,transaction=concatenate(dhistory,dtoday))
+    if (len(dhistory[IDATE]) > 0 and len(dtoday[IDATE])>0 and dhistory[IDATE][-1] >= dtoday[IDATE][-1]) or len(dtoday[0])==0:
+        hdata = BaseObject(name=instrument,instrument=instrument,transaction=dhistory)
+    else:
+        hdata = BaseObject(name=instrument,instrument=instrument,transaction=concatenate(dhistory,dtoday))
     return hdata
 
 def read1_c(instrument,tday,length=6000,path=DATA_PATH,extractor=extract_std,readfunc=read_data):
@@ -144,7 +148,10 @@ def read1_c(instrument,tday,length=6000,path=DATA_PATH,extractor=extract_std,rea
     t2order = t2order_if if is_if(instrument) else t2order_com
     dhistory = read_min_as_list(make_his_filename(instrument,path),length=length,extractor=extractor,readfunc=readfunc,t2order=t2order)
     dtoday = read_min_as_list(make_min_filename_c(instrument,tday,path),length=length,extractor=extractor,readfunc=readfunc,t2order=t2order)
-    hdata = BaseObject(name=instrument,instrument=instrument,transaction=concatenate(dhistory,dtoday))
+    if (len(dhistory[IDATE]) > 0 and len(dtoday[IDATE])>0 and dhistory[IDATE][-1] >= dtoday[IDATE][-1]) or len(dtoday[0])==0:
+        hdata = BaseObject(name=instrument,instrument=instrument,transaction=dhistory)
+    else:
+        hdata = BaseObject(name=instrument,instrument=instrument,transaction=concatenate(dhistory,dtoday))
     return hdata#,dhistory,dtoday
 
 
