@@ -919,7 +919,8 @@ class Agent(AbsAgent):
             if last_current_time < last_min:    #如果已经有当分钟的记录，就不再需要保存了。
                 self.save_min(dinst)  
             #print 'in day_finalize'
-            hreader.check_merge(ddata.name,self.scur_day)
+            if self.save_flag == True:
+                hreader.check_merge(ddata.name,self.scur_day)
 
     def save_min(self,dinst):
         ddata = dinst.data
