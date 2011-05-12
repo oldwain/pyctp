@@ -21,18 +21,24 @@ import hreader
 import agent
 import config
 
+import UserApiStruct as ustruct
+import UserApiType as utype
+
+from base import *
+
 class TraderMock(object):
     def initialze(self,myagent):
         self.myagent = myagent
 
     def ReqOrderInsert(self, order, request_id):
         '''报单录入请求, 需要调用成交函数'''
+        print 'in order insert'
         oid = order.OrderRef
         trade = ustruct.Trade(
                     InstrumentID = order.InstrumentID,
                     Direction=order.Direction,
                     Price = order.LimitPrice,
-                    Volume = order.Volume,
+                    Volume = order.VolumeTotalOriginal,
                     OrderRef = oid,
                     TradeID=oid,
                     OrderSysID=oid,
@@ -44,26 +50,30 @@ class TraderMock(object):
 
     def ReqOrderAction(self, corder, request_id):
         '''撤单请求'''
-        oid = order.OrderRef
+        #print u'in cancel'
+        oid = corder.OrderRef
         rorder = ustruct.Order(
                     InstrumentID = corder.InstrumentID,
                     OrderRef = corder.OrderRef,
                 )
         self.myagent.rtn_order(rorder)
 
-    def ReqQryTradingAccount(self,req,req_id):
+    def ReqQryTradingAccount(self,req,req_id=0):
+        print u'in query account'
         account = BaseObject(Available=1000000) #测试余额总是100W
         self.myagent.rsp_qry_trading_account(account)
 
-    def ReqQryInstrument(self,req,req_id):#只有唯一一个合约
+    def ReqQryInstrument(self,req,req_id=0):#只有唯一一个合约
+        print u'in query instrument'
         ins = BaseObject(InstrumentID = req.InstrumentID,VolumeMultiple = 300,PriceTick=0.2)
         self.myagent.rsp_qry_instrument(ins)
 
-    def ReqQryInstrumentMarginRate(self,req,req_id):
+    def ReqQryInstrumentMarginRate(self,req,req_id=0):
+        print u'in query marinrate'
         mgr = BaseObject(InstrumentID = req.InstrumentID,LongMarginRatioByMoney=0.17,ShortMarginRatioByMoney=0.17)
         self.myagent.rsp_qry_instrument_marginrate(mgr)
 
-    def ReqQryInvestorPosition(self,req,req_id):
+    def ReqQryInvestorPosition(self,req,req_id=0):
         #暂默认无持仓
         pass
 
@@ -100,7 +110,7 @@ class SaveMock(object):
             self.agent.RtnTick(tick)
             #self.agent.RtnTick(tick)
 
-import time
+
 import logging
 
 class NULLAgent(object):
@@ -150,18 +160,36 @@ class NULLAgent(object):
     def RtnTick(self,ctick):#行情处理主循环
         pass
 
-
-def trade_mock(instrument='IF1104'):
-    logging.basicConfig(filename="ctp_trade_mock.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
- 
+def create_agent_with_mocktrader(instrument):
     trader = TraderMock()
     
     strategy_cfg = config.parse_strategy()
 
     ##这里没有考虑现场恢复，state中需注明当日
-    myagent = agent.Agent(trader,None,[instrument],strategy_cfg.strategy) 
+    cuser = BaseObject(broker_id='test',port=1111,investor_id='test',passwd='test')
+    myagent = agent.Agent(trader,cuser,[instrument],strategy_cfg.strategy) 
+
+    req = BaseObject(InstrumentID=instrument)
+    trader.ReqQryInstrumentMarginRate(req)
+    trader.ReqQryInstrument(req)
+    trader.ReqQryTradingAccount(req)
+    return myagent
+
+def run_ticks(ticks,myagent):
+    for tick in ticks:
+        myagent.inc_tick()
+        myagent.RtnTick(tick)
+
+
+def trade_mock(instrument='IF1104'):
+    logging.basicConfig(filename="ctp_trade_mock.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
+ 
+    myagent = create_agent_with_mocktrader(instrument)
 
     ticks = hreader.read_ticks(instrument,20110329)    #不加载当日数据
-    for tick in ticks:
-        myagent.RtnTick(tick)
+    #for tick in ticks:myagent.inc_tick(),myagent.RtnTick(tick)
+    #for tick in ticks:
+    #    myagent.inc_tick()
+    #    myagent.RtnTick(tick)
+    run_ticks(ticks,myagent)
 

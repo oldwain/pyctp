@@ -267,6 +267,7 @@ class MdSpiDelegate(MdSpi):
             #self.logger.debug(u'收到行情:%s,time=%s:%s' %(depth_market_data.InstrumentID,depth_market_data.UpdateTime,depth_market_data.UpdateMillisec))
             dp = depth_market_data
             self.logger.debug(u'收到行情，inst=%s,time=%s，volume=%s,last_volume=%s' % (dp.InstrumentID,dp.UpdateTime,dp.Volume,self.last_map[dp.InstrumentID]))
+            self.agent.inc_tick()
             if dp.Volume <= self.last_map[dp.InstrumentID]:
                 self.logger.debug(u'行情无变化，inst=%s,time=%s，volume=%s,last_volume=%s' % (dp.InstrumentID,dp.UpdateTime,dp.Volume,self.last_map[dp.InstrumentID]))
                 return  #行情未变化
@@ -598,7 +599,7 @@ class c_instrument(object):
                 continue
             objs[item.name].max_volume = item.max_volume #
             #objs[item.name].strategy = dict([(ss.get_name(),ss) for ss in item[1:]])
-            objs[item.name].strategy = dict([(name,ss) for ss in item.strategys])
+            objs[item.name].strategy = dict([(ss.name,ss) for ss in item.strategys])
             objs[item.name].initialize_positions()
         return objs
 
@@ -630,7 +631,7 @@ class c_instrument(object):
         self.begin_flag = False #save标志，默认第一个不保存, 因为第一次切换的上一个是历史数据
 
     def initialize_positions(self): #根据策略初始化头寸为0
-        self.position_detail = dict([(ss.name,strategy.Position(self.name,ss)) for ss in self.strategy.values()])
+        self.position_detail = dict([(ss.name,strategy.Position(self,ss)) for ss in self.strategy.values()])
 
     def calc_remained_volume(self):   #计算剩余的可开仓量
         locked_volume = 0
@@ -644,8 +645,11 @@ class c_instrument(object):
             所有price以0.1为基准
             返回的保证金以1为单位
         '''
+        #print self.name,self.marginrate[0],self.marginrate[1],self.multiple
         my_marginrate = self.marginrate[0] if direction == LONG else self.marginrate[1]
-        if self.name[:2].upper == 'IF':
+        #print 'self.name=%s,price=%s,multiple=%s,my_marginrate=%s' % (self.name,price,self.multiple,my_marginrate)
+        if self.name[:2].upper() == 'IF':
+            #print 'price=%s,multiple=%s,my_marginrate=%s' % (price,self.multiple,my_marginrate)
             return price / 10.0 * self.multiple * my_marginrate 
         else:
             return price * self.multiple * my_marginrate 
@@ -671,28 +675,39 @@ class AbsAgent(object):
 
     def inc_tick(self):
         self.tick += 1
-        self.check_commands()
+        #self.check_commands()
         return self.tick
 
     def get_tick(self):
         return self.tick
 
     def put_command(self,trigger_tick,command): #按顺序插入
-        cticks = [ttick for ttick,command in self.commands]
+        #print func_name(command)
+        cticks = [ttick for ttick,cmd in self.commands] #不要用command这个名称，否则会覆盖传入的参数,导致后面的插入操作始终插入的是原序列最后一个command的拷贝
         ii = bisect.bisect(cticks,trigger_tick)
+        #print 'trigger_tick=%s,cticks=%s,len(command)=%s' % (trigger_tick,str(cticks),len(self.commands))
         self.commands.insert(ii,(trigger_tick,command))
+        print 'trigger_tick=%s,cticks=%s,len(command)=%s' % (trigger_tick,str(cticks),len(self.commands))
 
     def check_commands(self):   
         '''
             执行命令队列中触发时间<=当前tick的命令. 注意一个tick=0.5s
             以后考虑一个tick只触发一个命令?
         '''
+        #print 'in check command'
         l = len(self.commands)
         i = 0
+        #if l>0:
+        #    pass
+        #    print 'in check command,len=%s,self.tick=%s,command time=%s' % (l,self.tick,self.commands[-1][0])
         while(i<l and self.tick >= self.commands[i][0]):
+            print 'exec command,i=%s,tick=%s,command[i][0]=%s' % (i,self.tick,self.commands[i][0])
             self.commands[i][1]()
             i += 1
-        del self.commands[0:i]
+        if i>0:
+            print 'del execed command'
+            del self.commands[0:i]
+        #print len(self.commands)
 
 
 class Agent(AbsAgent):
@@ -707,6 +722,7 @@ class Agent(AbsAgent):
         ##计时, 用来激发队列
         ##
         self.trader = trader
+        self.trader.myagent = self
         self.cuser = cuser
         self.strategy = my_strategy
         self.instruments = c_instrument.create_instruments(instruments,my_strategy)
@@ -1074,18 +1090,22 @@ class Agent(AbsAgent):
         cur_inst = self.instruments[ctick.instrument]
         for ss in cur_inst.strategy.values():
             mysignal = ss.opener.check(cur_inst.data,ctick)
+            if mysignal[0] == 1:
+                pass
+                #print 'is signal:%s' % (ctick.min1,)
             if mysignal[0] != 0:
                 base_price = mysignal[1] if mysignal[1]>0 else ctick.price
-                candidate = Order(instrument=cur_inst,
+                candidate = strategy.Order(#instrument=cur_inst,
                                 position=cur_inst.position_detail[ss.name],
                                 base_price=base_price,
-                                target_price=strategy.opener.calc_target_price(base_price,cur_inst.tick_base),
-                                mytime = ctike.time,
+                                target_price=ss.opener.calc_target_price(base_price,cur_inst.tick_base),
+                                mytime = ctick.time,
                                 action_type=XOPEN,
                             )
-                candidate.volume = self.calc_open_volume(instrument,order)
+                candidate.volume,margin_amount = self.calc_open_volume(cur_inst,candidate)
+                #print 'candidate volume:',candidate.volume
                 if candidate.volume > 0:
-                    self.available -= (want_volume *margin_amount)  #锁定保证金
+                    self.available -= (candidate.volume *margin_amount)  #锁定保证金
                     signals.append(candidate)
         return signals
 
@@ -1097,16 +1117,18 @@ class Agent(AbsAgent):
         want_volume = order.position.calc_open_volume()
         if want_volume <= 0:
             return 0
-        margin_amount = instrument.calc_margin_amount(order.target_price,order.strategy.direction)
+        margin_amount = instrument.calc_margin_amount(order.target_price,order.position.strategy.direction)
+        print 'want_volume:%s,margin_amount:%s' % (want_volume,margin_amount)
         if margin_amount <= 1:#不可能只有1块钱
             self.logger.error(u'合约%s保证金率未初始化' % (instrument.name,))
             print u'合约%s保证金率未初始化' % (instrument.name,)
         available_volume = int(self.available / margin_amount)
+        print 'int(self.available=%s,margin_amount=%s' % (int(self.available),margin_amount)
         if available_volume == 0:
             return 0
-        if want_volume > availabel_volume:
-            want_volume = availabel_volume
-        return want_volume
+        if want_volume > available_volume:
+            want_volume = available_volume
+        return want_volume,margin_amount
 
     def make_command(self,orders):
         '''
@@ -1126,10 +1148,12 @@ class Agent(AbsAgent):
             if order.action_type == XOPEN:##开仓情况,X跳后不论是否成功均撤单
                 self.transmitting_orders[command.order_ref] = order
                 ##初始化止损类
-                order.stoper = order.position.strategy.stoper(order.instrument.data,order.base_price)
+                order.stoper = order.position.strategy.closer(order.instrument.data,order.base_price)
+                print 'cur_tick=%s,valid_length=%s' % (self.get_tick(),order.position.strategy.opener.valid_length,)
                 self.put_command(self.get_tick()+order.position.strategy.opener.valid_length,fcustom(self.cancel_command,command=command))
                 self.open_position(command)
             else:#平仓, Y跳后不论是否成功均撤单, 撤单应该比开仓更快，避免追不上
+                #print u'平仓'
                 self.transmitting_orders[command.order_ref] = order.source_order
                 self.put_command(self.get_tick()+position.stoper.valid_length,fcustom(self.cancel_command,command=command))
                 self.close_position(command)
@@ -1191,6 +1215,7 @@ class Agent(AbsAgent):
         '''
             发出撤单指令
         '''
+        print 'in cancel command'
         req = ustruct.InputOrderAction(
                 InstrumentID = command.instrument,
                 OrderRef = str(command.order_ref),
@@ -1243,8 +1268,7 @@ class Agent(AbsAgent):
                 cposs.add(cur_position)
         for pos in cposs:
             pos.re_calc()
-
-
+        return state
     ###交易
 
     ###回应
@@ -1255,6 +1279,7 @@ class Agent(AbsAgent):
                    在OnTrade中进行position的细致处理 
             #TODO: 必须处理策略分类持仓汇总和持仓总数不匹配时的问题
         '''
+        print u'in rtn_trade'
         if strade.OrderRef not in self.transmitting_orders or strade.InstrumentID not in self.instruments:
             self.logger.warning(u'收到非本程序发出的成交回报:%s-%s' % (strade.InstrumentID,strade.OrderRef))
         cur_inst = self.instruments[strade.InstrumentID]
@@ -1265,6 +1290,7 @@ class Agent(AbsAgent):
             myorder.source_order.on_close(price=int(strade.Price*10+0.1),volume=strade.Volume,trade_time=strade.TradeTime)
         self.save_state()
         ##查询可用资金
+        #print 'fetch_trading_account'
         self.put_command(self.get_tick()+1,self.fetch_trading_account)
 
 
@@ -1319,7 +1345,7 @@ class Agent(AbsAgent):
             查询保证金率回报. 
         '''
         self.instruments[marginRate.InstrumentID].marginrate = (marginRate.LongMarginRatioByMoney,marginRate.ShortMarginRatioByMoney)
-        #print str(marginRate)
+        #print marginRate.InstrumentID,self.instruments[marginRate.InstrumentID].marginrate
         self.check_qry_commands()
 
     def rsp_qry_trading_account(self,account):

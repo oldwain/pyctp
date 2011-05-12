@@ -141,11 +141,18 @@ CFs = CF109,CF107
             sscs = scs.strip()
             if sscs == '':
                 continue
-            current_strategy = base.BaseObject(name=sscs)
-            current_strategy.max_holding = int(cfg.get(sscs,'max_holding'))
-            current_strategy.open_volume = int(cfg.get(sscs,'open_volume'))
-            current_strategy.opener = smod.__dict__[cfg.get(sscs,'opener').strip()]()   #需要实例化
-            current_strategy.closer = smod.__dict__[cfg.get(sscs,'closer').strip()]
+            #current_strategy = base.BaseObject(name=sscs)
+            #current_strategy.max_holding = int(cfg.get(sscs,'max_holding'))
+            #current_strategy.open_volume = int(cfg.get(sscs,'open_volume'))
+            #current_strategy.opener = smod.__dict__[cfg.get(sscs,'opener').strip()]()   #需要实例化
+            #current_strategy.closer = smod.__dict__[cfg.get(sscs,'closer').strip()]
+            current_strategy = strategy.STRATEGY(name = sscs,
+                    opener = smod.__dict__[cfg.get(sscs,'opener').strip()],
+                    closer = smod.__dict__[cfg.get(sscs,'closer').strip()],
+                    max_holding = int(cfg.get(sscs,'max_holding')),
+                    open_volume = int(cfg.get(sscs,'open_volume')),
+                )
+
             cs.strategys.append(current_strategy)
         config.strategy[sti] = cs
     return config

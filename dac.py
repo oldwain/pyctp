@@ -274,7 +274,7 @@ def MA1(data):
     '''
         动态计算基本均线, 1分钟的5/7/10/13/20/30/60/120/135/270均线
     '''
-    print u'before:收盘序列长度:%s,ma5序列长度:%s' % (len(data.sclose),len(data.ma_5))
+    #print u'before:收盘序列长度:%s,ma5序列长度:%s' % (len(data.sclose),len(data.ma_5))
     data.ma_1.append(0)
     data.ma_5.append(0)
     #data.ma_7.append(0)
@@ -297,6 +297,7 @@ def MA1(data):
     ma1(data.sclose,120,data.ma_120)
     #ma1(data.sclose,135,data.ma_135)
     ma1(data.sclose,270,data.ma_270)
-    print u'after:收盘序列长度:%s,ma5序列长度:%s' % (len(data.sclose),len(data.ma_5))
+    #print u'after:收盘序列长度:%s,ma5序列长度:%s' % (len(data.sclose),len(data.ma_5))
+    assert len(data.sclose) == len(data.ma_5),u'sclose序列和ma_5序列长度不同 len(data.sclose)=%s,len(data.ma5)=%s' % (len(data.sclose),len(data.ma_5))
 
 
