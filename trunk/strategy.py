@@ -85,13 +85,17 @@ class Position(object):
         self.locked_volume = 0  #被当前头寸锁定的(包括持仓的和发出未成交的)
 
     def calc_open_volume(self):   #用来计算Position的当次可开仓数
+        #print 'self.strategy.max_holding:%s' % (self.strategy.max_holding,)
         self.re_calc()
         #剩余开仓总数 = 策略持仓限量 - 已开仓数，若小于0则为0
         remained = self.strategy.max_holding - self.locked_volume if self.strategy.max_holding > self.locked_volume else 0
-        inst_remained = instrument.calc_remained_volume()
+        #print 'remained:%s' % (remained,)
+        inst_remained = self.instrument.calc_remained_volume()
+        #print 'remained:%s,inst_remained:%s' % (remained,inst_remained)
         if remained > inst_remained:
             remained = inst_remained
         #本次可开仓数 = 策略单次开仓数 和 剩余开仓总数 的小者
+        #print 'self.strategy.open_volume:%s' % (self.strategy.open_volume,)
         return self.strategy.open_volume if self.strategy.open_volume <=  remained else remained
 
     def re_calc(self): #
@@ -133,6 +137,7 @@ class Resumable(object):#可中间恢复
 ###突破类策略以当前价为基准价，以一定额度的加价作为开仓限价以确保开仓，同时根据基准价来计算止损
 '''
     check方法签名为(self,data,ctick)
+    返回值为(触发标志,触发价格), 触发标志!=0时触发，触发价格==0时为当前价
 '''
 
 MAX_OVERFLOW = 60   #最大溢点，即开仓时加价跳数
@@ -313,15 +318,18 @@ datr_short_stoper_12 = fcustom(DATR_SHORT_STOPER,rbase=0.12)
 
 class STRATEGY(object):#策略基类, 单纯包装
     def __init__(self,
+                name,
                 opener, #开仓类(注意，不是对象)
                 closer, #平仓类(注意，不是对象)
                 open_volume, #每次开仓手数   
                 max_holding, #最大持仓手数 
             ):
+        self.name = name
         self.opener = opener()  #单一策略可共享开仓对象
         self.closer = closer    #平仓对象必须用开仓时的上下文初始化
         self.open_volume = open_volume
         self.max_holding = max_holding
+        self.direction = self.opener.direction
 
     def get_name(self):
         return u'%s_%s_%s_%s' % (self.opener.name,self.closer.name,self.open_volume,self.max_holding)
