@@ -47,20 +47,24 @@ class Order(object):
         self.cancelled = False  #是否已经撤单
 
     def on_trade(self,price,volume,trade_time):
+        #print u'price=%s,volume=%s,trade_time=%s' % (price,volume,trade_time)
         self.opened_volume += volume
         if self.volume < self.opened_volume:    #因为cancel和成交的时间差导致的
             self.volume = self.opened_volume
+        print u'price=%s,volume=%s,self.opened_volume=%s,is_closed=%s' % (price,volume,self.opened_volume,self.is_closed())
         self.trader_detail.append((price,volume,trade_time))
         self.position.re_calc()
         
     def on_close(self,price,volume,trade_time):
         self.opened_volume -= volume
         self.trade_detail.append((price,-volume,trade_time))
+        print 'on close'
         self.position.re_calc()
 
     def on_cancel(self):    #已经撤单
         self.cancelled = True
         self.volume = self.opened_volume    #不会再有成交回报
+        print 'on cancel'
         self.position.re_calc()
 
     def is_closed(self): #是否已经完全平仓
@@ -86,6 +90,7 @@ class Position(object):
 
     def calc_open_volume(self):   #用来计算Position的当次可开仓数
         #print 'self.strategy.max_holding:%s' % (self.strategy.max_holding,)
+        print 'in calc_open_volume,self=%s,self.name=%s' % (str(self),self.instrument.name)
         self.re_calc()
         #剩余开仓总数 = 策略持仓限量 - 已开仓数，若小于0则为0
         remained = self.strategy.max_holding - self.locked_volume if self.strategy.max_holding > self.locked_volume else 0
@@ -99,14 +104,18 @@ class Position(object):
         return self.strategy.open_volume if self.strategy.open_volume <=  remained else remained
 
     def re_calc(self): #
+        #print self.orders
         self.orders = [order for order in self.orders if not order.is_closed()]
+        print self.orders
         self.opened_volume = sum([order.opened_volume for order in self.orders])
         self.locked_volume = sum([order.volume for order in self.orders])
+        print u'in re_calc:opened=%s,locked=%s,self.strategy.name=%s' % (self.opened_volume,self.locked_volume,type_name(self.strategy.opener))
 
     def add_order(self,order):
         self.orders.append(order)
 
     def get_locked_volume(self):    #回复已经占用数
+        print u'in get locked volume self=%s,self.name=%s' % (str(self),self.instrument.name)
         self.re_calc()
         return self.locked_volume
 
