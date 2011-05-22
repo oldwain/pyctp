@@ -705,7 +705,7 @@ class AbsAgent(object):
             self.commands[i][1]()
             i += 1
         if i>0:
-            print 'del execed command'
+            #print 'del execed command'
             del self.commands[0:i]
         #print len(self.commands)
 
@@ -1052,7 +1052,7 @@ class Agent(AbsAgent):
         for position in cur_inst.position_detail.values():
             for order in position.orders:
                 if order.opened_volume > 0:
-                    mysignal = order.stoper.check(cur_inst.data,ctick)
+                    mysignal = order.stoper.check(ctick)
                     if mysignal[0] != 0:    #止损
                         signals.append(BaseObject(instrument=cur_inst,
                                 volume=order.opened_volume,
@@ -1116,7 +1116,7 @@ class Agent(AbsAgent):
         '''
         want_volume = order.position.calc_open_volume()
         if want_volume <= 0:
-            return 0
+            return (0,0)
         margin_amount = instrument.calc_margin_amount(order.target_price,order.position.strategy.direction)
         print 'want_volume:%s,margin_amount:%s' % (want_volume,margin_amount)
         if margin_amount <= 1:#不可能只有1块钱
@@ -1125,7 +1125,7 @@ class Agent(AbsAgent):
         available_volume = int(self.available / margin_amount)
         print 'int(self.available=%s,margin_amount=%s' % (int(self.available),margin_amount)
         if available_volume == 0:
-            return 0
+            return (0,0)
         if want_volume > available_volume:
             want_volume = available_volume
         return want_volume,margin_amount
@@ -1149,6 +1149,7 @@ class Agent(AbsAgent):
                 self.transmitting_orders[command.order_ref] = order
                 ##初始化止损类
                 order.stoper = order.position.strategy.closer(order.instrument.data,order.base_price)
+                order.position.add_order(order)
                 print 'cur_tick=%s,valid_length=%s' % (self.get_tick(),order.position.strategy.opener.valid_length,)
                 self.put_command(self.get_tick()+order.position.strategy.opener.valid_length,fcustom(self.cancel_command,command=command))
                 self.open_position(command)
@@ -1246,7 +1247,7 @@ class Agent(AbsAgent):
                     iorders.extend([order for order in position.orders if order.opened_volume>0])
         for inst,orders in cur_orders.items():
             cin = BaseObject(instrument = inst,opened_volume=sum([order.opened_volume for order in orders]),orders=orders)
-            state.holdings[inst] = cin
+            state.holdings[inst.name] = cin
         config.save_state(state)
         return
             

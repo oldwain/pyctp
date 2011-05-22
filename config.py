@@ -222,7 +222,7 @@ def parse_state(strategy_cfg,name='state.ini',root='State'):
             order.stoper = strategy_cfg.smodule.__dict__[cfg.get(soo,'stoper').strip()]()
             order.stoper.load_parameters(cfg.get(soo,'stoper_parameters').strip())
             order.base_price = int(cfg.get(soo,'base_price').strip())
-            order.current_stop_price = int(cfg.get(soo,'current_stop_price').strip())
+            order.stoper.set_cur_stop(int(cfg.get(soo,'current_stop_price').strip()))
             if cfg.has_option(soo,'target_price'):
                 order.target_price = int(cfg.get(soo,'target_price'))
             else:
@@ -272,7 +272,7 @@ def save_state(state,name='state.ini',root='State'):
     for key,value in state.holdings.items():
         cfg.add_section(key)
         onum = 1
-        cfg.set(key,'instrument',value.instrument)
+        cfg.set(key,'instrument',value.instrument.name)
         cfg.set(key,'opened_volume',value.opened_volume)
         ostr = []
         for order in value.orders:
@@ -282,7 +282,7 @@ def save_state(state,name='state.ini',root='State'):
             cfg.add_section(mystr)
             cfg.set(mystr,'volume',order.volume)
             cfg.set(mystr,'base_price',order.base_price)
-            cfg.set(mystr,'current_stop_price',order.current_stop_price)
+            cfg.set(mystr,'current_stop_price',order.stoper.get_cur_stop())
             cfg.set(mystr,'strategy_name',order.get_strategy_name())
             #cfg.set(mystr,'opener',base.type_name(order.get_opener()))
             #cfg.set(mystr,'opener_parameters',order.get_opener().save_parameters())
