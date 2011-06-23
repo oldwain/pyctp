@@ -79,6 +79,15 @@ class Order(object):
     def get_strategy_name(self):
         return self.position.strategy.name
 
+    def __str__(self):
+        return u'______订单: 合约=%s,开仓策略=%s,方向=%s,目标数=%s,开仓数=%s,状态=%s' % (self.instrument.name,
+                self.get_strategy_name(),
+                u'多' if self.direction==utype.THOST_FTDC_D_Buy else u'空',
+                self.volume,
+                self.opened_volume,
+                u'无效' if self.cancelled else u'有效',
+            )
+
 ####头寸
 class Position(object):
     def __init__(self,instrument,strategy):
@@ -90,7 +99,8 @@ class Position(object):
 
     def calc_open_volume(self):   #用来计算Position的当次可开仓数
         #print 'self.strategy.max_holding:%s' % (self.strategy.max_holding,)
-        print 'in calc_open_volume,self=%s,self.name=%s' % (str(self),self.instrument.name)
+        #print 'in calc_open_volume,self=%s,self.name=%s' % (str(self),self.instrument.name)
+        print u'__计算头寸可开仓数,合约=%s,头寸=%s' % (self.instrument.name,str(self))
         self.re_calc()
         #剩余开仓总数 = 策略持仓限量 - 已开仓数，若小于0则为0
         remained = self.strategy.max_holding - self.locked_volume if self.strategy.max_holding > self.locked_volume else 0
@@ -106,16 +116,19 @@ class Position(object):
     def re_calc(self): #
         #print self.orders
         self.orders = [order for order in self.orders if not order.is_closed()]
-        print self.orders
+        #print self.orders
+        for mo in self.orders:print mo
         self.opened_volume = sum([order.opened_volume for order in self.orders])
         self.locked_volume = sum([order.volume for order in self.orders])
-        print u'in re_calc:opened=%s,locked=%s,self.strategy.name=%s' % (self.opened_volume,self.locked_volume,type_name(self.strategy.opener))
+        #print u'in re_calc:opened=%s,locked=%s,self.strategy.name=%s' % (self.opened_volume,self.locked_volume,type_name(self.strategy.opener))
+        print u'____重新计算头寸，开仓数=%s 锁定数=%s,策略=%s' % (self.opened_volume,self.locked_volume,type_name(self.strategy.opener))
 
     def add_order(self,order):
         self.orders.append(order)
 
     def get_locked_volume(self):    #回复已经占用数
-        print u'in get locked volume self=%s,self.name=%s' % (str(self),self.instrument.name)
+        #print u'in get locked volume self=%s,self.name=%s' % (str(self),self.instrument.name)
+        print u'__ 获取头寸的锁定数, 合约=%s,头寸=%s' % (self.instrument.name,str(self))
         self.re_calc()
         return self.locked_volume
 

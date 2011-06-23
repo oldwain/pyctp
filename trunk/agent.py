@@ -881,7 +881,7 @@ class Agent(AbsAgent):
         #print u'in my lock, close长度:%s,ma_5长度:%s\n' %(len(self.instrument[ctick.instrument].data.sclose),len(self.instrument[ctick.instrument].data.ma_5))
         inst = ctick.instrument
         if not self.prepare_tick(ctick):    #非法ticks数据
-            print 'invalid ticks'
+            #print 'invalid ticks'
             return 
         #先平仓
         close_positions = self.check_close_signal(ctick)
@@ -930,7 +930,7 @@ class Agent(AbsAgent):
             else:   #不存在151500或150000.则将最后一分钟保存
                 self.save_min(dinst)
             '''
-            last_current_time = hreader.read_current_last(dinst.name).time
+            last_current_time = hreader.read_current_last_c(dinst.name,self.scur_day).time
             print 'time:',last_current_time,last_min
             if last_current_time < last_min:    #如果已经有当分钟的记录，就不再需要保存了。
                 self.save_min(dinst)  
@@ -1089,7 +1089,9 @@ class Agent(AbsAgent):
             return signals
         cur_inst = self.instruments[ctick.instrument]
         for ss in cur_inst.strategy.values():
+            #print u'检查开仓...%s:%s %s,ss.name=%s' % (ctick.min1,ctick.sec,ctick.msec,ss.name)
             mysignal = ss.opener.check(cur_inst.data,ctick)
+            #print u'检查完毕..........'
             if mysignal[0] == 1:
                 pass
                 #print 'is signal:%s' % (ctick.min1,)
@@ -1216,7 +1218,8 @@ class Agent(AbsAgent):
         '''
             发出撤单指令
         '''
-        print 'in cancel command'
+        #print 'in cancel command'
+        print u'取消命令'
         req = ustruct.InputOrderAction(
                 InstrumentID = command.instrument,
                 OrderRef = str(command.order_ref),
@@ -1280,8 +1283,8 @@ class Agent(AbsAgent):
                    在OnTrade中进行position的细致处理 
             #TODO: 必须处理策略分类持仓汇总和持仓总数不匹配时的问题
         '''
-        print u'in rtn_trade'
-        if strade.OrderRef not in self.transmitting_orders or strade.InstrumentID not in self.instruments:
+        print u'in rtn_trade,orderref=%s,orders=%s,instruments=%s' % (strade.OrderRef,self.transmitting_orders,self.instruments)
+        if int(strade.OrderRef) not in self.transmitting_orders or strade.InstrumentID not in self.instruments:
             self.logger.warning(u'收到非本程序发出的成交回报:%s-%s' % (strade.InstrumentID,strade.OrderRef))
         cur_inst = self.instruments[strade.InstrumentID]
         myorder = self.transmitting_orders[int(strade.OrderRef)]
@@ -1507,6 +1510,7 @@ trader.RegisterSpi(None)
     '''
     logging.basicConfig(filename="ctp_trade.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
     
+
     trader = TraderApi.CreateTraderApi("trader")
 
     cfg = config.parse_base(name,base)
