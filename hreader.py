@@ -153,6 +153,8 @@ def read1_c(instrument,tday,length=6000,path=DATA_PATH,extractor=extract_std,rea
     #6000是22天，足够应付日ATR计算
     t2order = t2order_if if is_if(instrument) else t2order_com
     dhistory = read_min_as_list(make_his_filename(instrument,path),length=length,extractor=extractor,readfunc=readfunc,t2order=t2order)
+    if tday == -1: #不需要当日数据,用于测试时的初始化
+        return BaseObject(name=instrument,instrument=instrument,transaction=dhistory)
     dtoday = read_min_as_list(make_min_filename_c(instrument,tday,path),length=length,extractor=extractor,readfunc=readfunc,t2order=t2order)
     if (len(dhistory[IDATE]) > 0 and len(dtoday[IDATE])>0 and dhistory[IDATE][-1] >= dtoday[IDATE][-1]) or len(dtoday[0])==0:
         hdata = BaseObject(name=instrument,instrument=instrument,transaction=dhistory)
@@ -169,6 +171,7 @@ def read_history(instrument_id,path):
     return read1(instrument_id,path=path)
 
 def read_history_c(instrument_id,tday,path):#指定当前日，用于测试
+    print 'instrument=%s,tday=%s' %(instrument_id,tday)
     return read1_c(instrument_id,tday=tday,path=path)
 
 def read_history_last(instrument_id,path=DATA_PATH):

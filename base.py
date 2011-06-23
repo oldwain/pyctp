@@ -12,6 +12,32 @@ XBASE = 100 #用于一般化的除数基数
 import sys
 import functools
 
+import logging
+MY_FORMAT = '%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s'
+CONSOLE_FORMAT = '**%(message)s'
+
+#设定日志
+def config_logging(filename,level=logging.DEBUG,format=MY_FORMAT,to_console=True,console_level=logging.INFO):
+    logging.basicConfig(filename=filename,level=level,format=format)
+    if to_console:
+        add_log2console(console_level)
+
+#将指定级别的日志同时输出到控制台
+def add_log2console(level = logging.INFO):
+    console = logging.StreamHandler()
+    console.setLevel(level)
+    # set a format which is simpler for console use
+    #formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+    #formatter = logging.Formatter('%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
+    formatter = logging.Formatter(CONSOLE_FORMAT)
+    # tell the handler to use this format
+    console.setFormatter(formatter)
+    # add the handler to the root logger
+    logging.getLogger('').addHandler(console)
+    
+
+
+
 def inverse_direction(direction):
     return LONG if direction == SHORT else SHORT
 

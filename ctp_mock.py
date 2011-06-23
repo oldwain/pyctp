@@ -160,14 +160,14 @@ class NULLAgent(object):
     def RtnTick(self,ctick):#行情处理主循环
         pass
 
-def create_agent_with_mocktrader(instrument):
+def create_agent_with_mocktrader(instrument,tday):
     trader = TraderMock()
     
     strategy_cfg = config.parse_strategy()
 
     ##这里没有考虑现场恢复，state中需注明当日
     cuser = BaseObject(broker_id='test',port=1111,investor_id='test',passwd='test')
-    myagent = agent.Agent(trader,cuser,[instrument],strategy_cfg.strategy) 
+    myagent = agent.Agent(trader,cuser,[instrument],strategy_cfg.strategy,tday=tday) 
 
     req = BaseObject(InstrumentID=instrument)
     trader.ReqQryInstrumentMarginRate(req)
@@ -180,13 +180,16 @@ def run_ticks(ticks,myagent):
         myagent.inc_tick()
         myagent.RtnTick(tick)
 
+def log_config():
+    config_logging('ctp_trade_mock.log')
 
 def trade_mock(instrument='IF1104'):
-    logging.basicConfig(filename="ctp_trade_mock.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
- 
-    myagent = create_agent_with_mocktrader(instrument)
+    #logging.basicConfig(filename="ctp_trade_mock.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
 
-    ticks = hreader.read_ticks(instrument,20110329)    #不加载当日数据
+    tday = 20110329
+    myagent = create_agent_with_mocktrader(instrument,-1)    #不需要tday的当日数据
+    myagent.scur_day = tday
+    ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
     #for tick in ticks:myagent.inc_tick(),myagent.RtnTick(tick)
     #for tick in ticks:
     #    myagent.inc_tick()
