@@ -1090,9 +1090,6 @@ class Agent(AbsAgent):
             #print u'检查开仓...%s:%s %s,ss.name=%s' % (ctick.min1,ctick.sec,ctick.msec,ss.name)
             mysignal = ss.opener.check(cur_inst.data,ctick)
             #print u'检查完毕..........'
-            if mysignal[0] == 1:
-                pass
-                #print 'is signal:%s' % (ctick.min1,)
             if mysignal[0] != 0:
                 base_price = mysignal[1] if mysignal[1]>0 else ctick.price
                 candidate = strategy.Order(#instrument=cur_inst,
@@ -1113,16 +1110,18 @@ class Agent(AbsAgent):
         '''
             计算order的可开仓数
             instrument: 合约对象
+
+            先计算理论可开数，然后根据可用保证金调整
         '''
         want_volume = order.position.calc_open_volume()
         if want_volume <= 0:
             return (0,0)
         margin_amount = instrument.calc_margin_amount(order.target_price,order.position.strategy.direction)
-        logging.info('A_COV:want_volume:%s,margin_amount:%s' % (want_volume,margin_amount))
+        logging.info(u'A_COV:理论开仓数:%s,单手保证金:%s' % (want_volume,margin_amount))
         if margin_amount <= 1:#不可能只有1块钱
             self.logger.error(u'合约%s保证金率未初始化' % (instrument.name,))
         available_volume = int(self.available / margin_amount)
-        logging.info(u'A_COV:int(self.available=%s,margin_amount=%s' % (int(self.available),margin_amount))
+        logging.info(u'A_COV:可用保证金=%s,单手保证金=%s' % (int(self.available),margin_amount))
         if available_volume == 0:
             return (0,0)
         if want_volume > available_volume:
@@ -1149,7 +1148,7 @@ class Agent(AbsAgent):
                 ##初始化止损类
                 order.stoper = order.position.strategy.closer(order.instrument.data,order.base_price)
                 order.position.add_order(order)
-                logging.info(u'A_MC:cur_tick=%s,valid_length=%s' % (self.get_tick(),order.position.strategy.opener.valid_length,))
+                logging.info(u'A_MC:当前tick=%s,下单有效时长(超过该时长未成交则撤单)=%s' % (self.get_tick(),order.position.strategy.opener.valid_length,))
                 self.put_command(self.get_tick()+order.position.strategy.opener.valid_length,fcustom(self.cancel_command,command=command))
                 self.open_position(command)
             else:#平仓, Y跳后不论是否成功均撤单, 撤单应该比开仓更快，避免追不上
@@ -1280,7 +1279,7 @@ class Agent(AbsAgent):
                    在OnTrade中进行position的细致处理 
             #TODO: 必须处理策略分类持仓汇总和持仓总数不匹配时的问题
         '''
-        logging.info(u'A_RT1:in rtn_trade,orderref=%s,orders=%s,instruments=%s' % (strade.OrderRef,self.transmitting_orders,self.instruments))
+        logging.info(u'A_RT1:成交回报,%s:orderref=%s,orders=%s' % (self.instruments,strade.OrderRef,self.transmitting_orders))
         if int(strade.OrderRef) not in self.transmitting_orders or strade.InstrumentID not in self.instruments:
             self.logger.warning(u'A_RT2:收到非本程序发出的成交回报:%s-%s' % (strade.InstrumentID,strade.OrderRef))
         cur_inst = self.instruments[strade.InstrumentID]
