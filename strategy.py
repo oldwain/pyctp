@@ -7,6 +7,8 @@
 
 '''
 
+import logging
+
 import UserApiType as utype
 
 
@@ -51,20 +53,20 @@ class Order(object):
         self.opened_volume += volume
         if self.volume < self.opened_volume:    #因为cancel和成交的时间差导致的
             self.volume = self.opened_volume
-        print u'price=%s,volume=%s,self.opened_volume=%s,is_closed=%s' % (price,volume,self.opened_volume,self.is_closed())
+        logging.info(u'price=%s,volume=%s,self.opened_volume=%s,is_closed=%s' % (price,volume,self.opened_volume,self.is_closed()))
         self.trader_detail.append((price,volume,trade_time))
         self.position.re_calc()
         
     def on_close(self,price,volume,trade_time):
         self.opened_volume -= volume
         self.trade_detail.append((price,-volume,trade_time))
-        print 'on close'
+        logging.info('on close')
         self.position.re_calc()
 
     def on_cancel(self):    #已经撤单
         self.cancelled = True
         self.volume = self.opened_volume    #不会再有成交回报
-        print 'on cancel'
+        logging.info('on cancel')
         self.position.re_calc()
 
     def is_closed(self): #是否已经完全平仓
@@ -80,7 +82,7 @@ class Order(object):
         return self.position.strategy.name
 
     def __str__(self):
-        return u'______订单: 合约=%s,开仓策略=%s,方向=%s,目标数=%s,开仓数=%s,状态=%s' % (self.instrument.name,
+        return u'Order_A: 合约=%s,开仓策略=%s,方向=%s,目标数=%s,开仓数=%s,状态=%s' % (self.instrument.name,
                 self.get_strategy_name(),
                 u'多' if self.direction==utype.THOST_FTDC_D_Buy else u'空',
                 self.volume,
@@ -100,7 +102,7 @@ class Position(object):
     def calc_open_volume(self):   #用来计算Position的当次可开仓数
         #print 'self.strategy.max_holding:%s' % (self.strategy.max_holding,)
         #print 'in calc_open_volume,self=%s,self.name=%s' % (str(self),self.instrument.name)
-        print u'__计算头寸可开仓数,合约=%s,头寸=%s' % (self.instrument.name,str(self))
+        logging.info(u'PA:计算头寸可开仓数,合约=%s,头寸=%s' % (self.instrument.name,str(self)))
         self.re_calc()
         #剩余开仓总数 = 策略持仓限量 - 已开仓数，若小于0则为0
         remained = self.strategy.max_holding - self.locked_volume if self.strategy.max_holding > self.locked_volume else 0
@@ -117,20 +119,24 @@ class Position(object):
         #print self.orders
         self.orders = [order for order in self.orders if not order.is_closed()]
         #print self.orders
-        for mo in self.orders:print mo
+        for mo in self.orders:
+            logging.info(str(mo))
         self.opened_volume = sum([order.opened_volume for order in self.orders])
         self.locked_volume = sum([order.volume for order in self.orders])
         #print u'in re_calc:opened=%s,locked=%s,self.strategy.name=%s' % (self.opened_volume,self.locked_volume,type_name(self.strategy.opener))
-        print u'____重新计算头寸，开仓数=%s 锁定数=%s,策略=%s' % (self.opened_volume,self.locked_volume,type_name(self.strategy.opener))
+        logging.info(u'P_AB_1:重新计算头寸，开仓数=%s 锁定数=%s,%s' % (self.opened_volume,self.locked_volume,str(self)))
 
     def add_order(self,order):
         self.orders.append(order)
 
     def get_locked_volume(self):    #回复已经占用数
         #print u'in get locked volume self=%s,self.name=%s' % (str(self),self.instrument.name)
-        print u'__ 获取头寸的锁定数, 合约=%s,头寸=%s' % (self.instrument.name,str(self))
+        logging.info(u'PB:获取头寸的锁定数...,%s' % str(self))
         self.re_calc()
         return self.locked_volume
+
+    def __str__(self):
+        return u'%s:%s:%x' % (self.instrument.name,type_name(self.strategy.opener),id(self))
 
 ##########
 #策略和止损的公共基类
