@@ -222,17 +222,17 @@ class MdSpiDelegate(MdSpi):
 
     def checkErrorRspInfo(self, info):
         if info.ErrorID !=0:
-            logger.error(u"ErrorID:%s,ErrorMsg:%s" %(info.ErrorID,info.ErrorMsg))
+            logger.error(u"MD:ErrorID:%s,ErrorMsg:%s" %(info.ErrorID,info.ErrorMsg))
         return info.ErrorID !=0
 
     def OnRspError(self, info, RequestId, IsLast):
-        self.logger.error(u'requestID:%s,IsLast:%s,info:%s' % (RequestId,IsLast,str(info)))
+        self.logger.error(u'MD:requestID:%s,IsLast:%s,info:%s' % (RequestId,IsLast,str(info)))
 
     def OnFrontDisConnected(self, reason):
-        self.logger.info(u'front disconnected,reason:%s' % (reason,))
+        self.logger.info(u'MD:front disconnected,reason:%s' % (reason,))
 
     def OnFrontConnected(self):
-        self.logger.info(u'front connected')
+        self.logger.info(u'MD:front connected')
         self.user_login(self.broker_id, self.investor_id, self.passwd)
 
     def user_login(self, broker_id, investor_id, passwd):
@@ -240,14 +240,14 @@ class MdSpiDelegate(MdSpi):
         r=self.api.ReqUserLogin(req,self.agent.inc_request_id())
 
     def OnRspUserLogin(self, userlogin, info, rid, is_last):
-        self.logger.info(u'user login,info:%s,rid:%s,is_last:%s' % (info,rid,is_last))
+        self.logger.info(u'MD:user login,info:%s,rid:%s,is_last:%s' % (info,rid,is_last))
         scur_day = int(time.strftime('%Y%m%d'))
         if scur_day > self.agent.scur_day:    #换日,重新设置volume
-            print u'换日, %s-->%s' % (self.agent.scur_day,scur_day)
+            self.logger.info(u'MD:换日, %s-->%s' % (self.agent.scur_day,scur_day))
             self.agent.scur_day = scur_day
             MdSpiDelegate.last_map = dict([(id,0) for id in self.instruments])
         if is_last and not self.checkErrorRspInfo(info):
-            self.logger.info(u"get today's trading day:%s" % repr(self.api.GetTradingDay()))
+            self.logger.info(u"MD:get today's trading day:%s" % repr(self.api.GetTradingDay()))
             self.subscribe_market_data(self.instruments)
 
     def subscribe_market_data(self, instruments):
@@ -261,15 +261,15 @@ class MdSpiDelegate(MdSpi):
             #mylock.acquire()
             #self.logger.debug(u'获得锁.................,mylock.id=%s' % id(mylock))        
             if depth_market_data.LastPrice > 999999 or depth_market_data.LastPrice < 10:
-                self.logger.warning(u'收到的行情数据有误:%s,LastPrice=:%s' %(depth_market_data.InstrumentID,depth_market_data.LastPrice))
+                self.logger.warning(u'MD:收到的行情数据有误:%s,LastPrice=:%s' %(depth_market_data.InstrumentID,depth_market_data.LastPrice))
             if depth_market_data.InstrumentID not in self.instruments:
-                self.logger.warning(u'收到未订阅的行情:%s' %(depth_market_data.InstrumentID,))
+                self.logger.warning(u'MD:收到未订阅的行情:%s' %(depth_market_data.InstrumentID,))
             #self.logger.debug(u'收到行情:%s,time=%s:%s' %(depth_market_data.InstrumentID,depth_market_data.UpdateTime,depth_market_data.UpdateMillisec))
             dp = depth_market_data
-            self.logger.debug(u'收到行情，inst=%s,time=%s，volume=%s,last_volume=%s' % (dp.InstrumentID,dp.UpdateTime,dp.Volume,self.last_map[dp.InstrumentID]))
+            self.logger.debug(u'MD:收到行情，inst=%s,time=%s，volume=%s,last_volume=%s' % (dp.InstrumentID,dp.UpdateTime,dp.Volume,self.last_map[dp.InstrumentID]))
             self.agent.inc_tick()
             if dp.Volume <= self.last_map[dp.InstrumentID]:
-                self.logger.debug(u'行情无变化，inst=%s,time=%s，volume=%s,last_volume=%s' % (dp.InstrumentID,dp.UpdateTime,dp.Volume,self.last_map[dp.InstrumentID]))
+                self.logger.debug(u'MD:行情无变化，inst=%s,time=%s，volume=%s,last_volume=%s' % (dp.InstrumentID,dp.UpdateTime,dp.Volume,self.last_map[dp.InstrumentID]))
                 return  #行情未变化
             self.last_map[dp.InstrumentID] = dp.Volume
             #mylock.release()   #至此已经去掉重复的数据
@@ -317,7 +317,7 @@ class MdSpiDelegate(MdSpi):
             rev.date = int(market_data.TradingDay)
             rev.time = rev.date%10000 * 10000+ rev.min1*100 + rev.sec
         except Exception,inst:
-            self.logger.warning(u'行情数据转换错误:%s' % str(inst))
+            self.logger.warning(u'MD:行情数据转换错误:%s' % str(inst))
         return rev
 
 class TraderSpiDelegate(TraderSpi):
@@ -348,21 +348,21 @@ class TraderSpiDelegate(TraderSpi):
         '''
             当客户端与交易后台建立起通信连接时（还未登录前），该方法被调用。
         '''
-        self.logger.info(u'trader front connected')
+        self.logger.info(u'TD:trader front connected')
         self.user_login(self.broker_id, self.investor_id, self.passwd)
 
     def OnFrontDisconnected(self, nReason):
-        self.logger.info(u'trader front disconnected,reason=%s' % (nReason,))
+        self.logger.info(u'TD:trader front disconnected,reason=%s' % (nReason,))
 
     def user_login(self, broker_id, investor_id, passwd):
         req = ustruct.ReqUserLogin(BrokerID=broker_id, UserID=investor_id, Password=passwd)
         r=self.api.ReqUserLogin(req,self.agent.inc_request_id())
 
     def OnRspUserLogin(self, pRspUserLogin, pRspInfo, nRequestID, bIsLast):
-        self.logger.info('trader login')
-        self.logger.debug("loggin %s" % str(pRspInfo))
+        self.logger.info('TD:trader login')
+        self.logger.debug("TD:loggin %s" % str(pRspInfo))
         if not self.isRspSuccess(pRspInfo):
-            self.logger.warning(u'trader login failed, errMsg=%s' %(pRspInfo.ErrorMsg,))
+            self.logger.warning(u'TD:trader login failed, errMsg=%s' %(pRspInfo.ErrorMsg,))
             return
         self.agent.login_success(pRspUserLogin.FrontID,pRspUserLogin.SessionID,pRspUserLogin.MaxOrderRef)
         #self.settlementInfoConfirm()
@@ -372,18 +372,18 @@ class TraderSpiDelegate(TraderSpi):
 
     def OnRspUserLogout(self, pUserLogout, pRspInfo, nRequestID, bIsLast):
         '''登出请求响应'''
-        self.logger.info(u'trader logout')
+        self.logger.info(u'TD:trader logout')
 
     def resp_common(self,rsp_info,bIsLast,name='默认'):
         #self.logger.debug("resp: %s" % str(rsp_info))
         if not self.isRspSuccess(rsp_info):
-            self.logger.info(u"%s失败" % name)
+            self.logger.info(u"TD:%s失败" % name)
             return -1
         elif bIsLast and self.isRspSuccess(rsp_info):
-            self.logger.info(u"%s成功" % name)
+            self.logger.info(u"TD:%s成功" % name)
             return 1
         else:
-            self.logger.info(u"%s结果: 等待数据接收完全..." % name)
+            self.logger.info(u"TD:%s结果: 等待数据接收完全..." % name)
             return 0
 
     def query_settlement_confirm(self):
@@ -401,7 +401,7 @@ class TraderSpiDelegate(TraderSpi):
 
     def query_settlement_info(self):
         #不填日期表示取上一天结算单,并在响应函数中确认
-        self.logger.info(u'取上一日结算单信息并确认,BrokerID=%s,investorID=%s' % (self.broker_id,self.investor_id))
+        self.logger.info(u'TD:取上一日结算单信息并确认,BrokerID=%s,investorID=%s' % (self.broker_id,self.investor_id))
         req = ustruct.QrySettlementInfo(BrokerID=self.broker_id,InvestorID=self.investor_id,TradingDay=u'')
         #print req.BrokerID,req.InvestorID,req.TradingDay
         self.api.ReqQrySettlementInfo(req,self.agent.inc_request_id())
@@ -414,8 +414,7 @@ class TraderSpiDelegate(TraderSpi):
         '''请求查询投资者结算信息响应'''
         print u'Rsp 结算单查询'
         if(self.resp_common(pRspInfo,bIsLast,u'结算单查询')>0):
-            print u'结算单内容:%s' % pSettlementInfo.Content
-            self.logger.info(u'结算单内容:%s' % pSettlementInfo.Content)
+            self.logger.info(u'TD:结算单内容:%s' % pSettlementInfo.Content)
             self.confirm_settlement_info()
         else:
             self.agent.initialize()
@@ -423,25 +422,25 @@ class TraderSpiDelegate(TraderSpi):
 
     def OnRspQrySettlementInfoConfirm(self, pSettlementInfoConfirm, pRspInfo, nRequestID, bIsLast):
         '''请求查询结算信息确认响应'''
-        self.logger.debug(u"结算单确认信息查询响应:rspInfo=%s,结算单确认=%s" % (pRspInfo,pSettlementInfoConfirm))
+        self.logger.debug(u"TD:结算单确认信息查询响应:rspInfo=%s,结算单确认=%s" % (pRspInfo,pSettlementInfoConfirm))
         #self.query_settlement_info()
         if(self.resp_common(pRspInfo,bIsLast,u'结算单确认情况查询')>0):
             if(pSettlementInfoConfirm == None or int(pSettlementInfoConfirm.ConfirmDate) < self.agent.scur_day):
                 #其实这个判断是不对的，如果周日对周五的结果进行了确认，那么周一实际上已经不需要再次确认了
                 if(pSettlementInfoConfirm != None):
-                    self.logger.info(u'最新结算单未确认，需查询后再确认,最后确认时间=%s,scur_day:%s' % (pSettlementInfoConfirm.ConfirmDate,self.agent.scur_day))
+                    self.logger.info(u'TD:最新结算单未确认，需查询后再确认,最后确认时间=%s,scur_day:%s' % (pSettlementInfoConfirm.ConfirmDate,self.agent.scur_day))
                 else:
-                    self.logger.info(u'结算单确认结果为None')
+                    self.logger.info(u'TD:结算单确认结果为None')
                 self.query_settlement_info()
             else:
-                self.logger.info(u'最新结算单已确认，不需再次确认,最后确认时间=%s,scur_day:%s' % (pSettlementInfoConfirm.ConfirmDate,self.agent.scur_day))
+                self.logger.info(u'TD:最新结算单已确认，不需再次确认,最后确认时间=%s,scur_day:%s' % (pSettlementInfoConfirm.ConfirmDate,self.agent.scur_day))
                 self.agent.initialize()
 
 
     def OnRspSettlementInfoConfirm(self, pSettlementInfoConfirm, pRspInfo, nRequestID, bIsLast):
         '''投资者结算结果确认响应'''
         if(self.resp_common(pRspInfo,bIsLast,u'结算单确认')>0):
-            self.logger.info(u'结算单确认时间: %s-%s' %(pSettlementInfoConfirm.ConfirmDate,pSettlementInfoConfirm.ConfirmTime))
+            self.logger.info(u'TD:结算单确认时间: %s-%s' %(pSettlementInfoConfirm.ConfirmDate,pSettlementInfoConfirm.ConfirmTime))
         self.agent.initialize()
 
 
@@ -474,7 +473,7 @@ class TraderSpiDelegate(TraderSpi):
             请求查询资金账户响应
         '''
         print u'查询资金账户响应'
-        self.logger.debug(u'资金账户响应:%s' % pTradingAccount)
+        self.logger.debug(u'TD:资金账户响应:%s' % pTradingAccount)
         if bIsLast and self.isRspSuccess(pRspInfo):
             self.agent.rsp_qry_trading_account(pTradingAccount)
         else:
@@ -503,14 +502,14 @@ class TraderSpiDelegate(TraderSpi):
     def OnRspError(self, info, RequestId, IsLast):
         ''' 错误应答
         '''
-        self.logger.error(u'requestID:%s,IsLast:%s,info:%s' % (RequestId,IsLast,str(info)))
+        self.logger.error(u'TD:requestID:%s,IsLast:%s,info:%s' % (RequestId,IsLast,str(info)))
 
     def OnRspQryOrder(self, pOrder, pRspInfo, nRequestID, bIsLast):
         '''请求查询报单响应'''
         if bIsLast and self.isRspSuccess(pRspInfo):
             self.agent.rsp_qry_order(pOrder)
         else:
-            self.logger.error(u'requestID:%s,IsLast:%s,info:%s' % (nRequestID,bIsLast,str(pRspInfo)))
+            self.logger.error(u'TD:requestID:%s,IsLast:%s,info:%s' % (nRequestID,bIsLast,str(pRspInfo)))
             pass
 
     def OnRspQryTrade(self, pTrade, pRspInfo, nRequestID, bIsLast):
@@ -529,7 +528,7 @@ class TraderSpiDelegate(TraderSpi):
             正常情况后不应该出现
         '''
         print pRspInfo,nRequestID
-        self.logger.warning(u'CTP报单录入错误回报, 正常后不应该出现,rspInfo=%s'%(str(pRspInfo),))
+        self.logger.warning(u'TD:CTP报单录入错误回报, 正常后不应该出现,rspInfo=%s'%(str(pRspInfo),))
         #self.logger.warning(u'报单校验错误,ErrorID=%s,ErrorMsg=%s,pRspInfo=%s,bIsLast=%s' % (pRspInfo.ErrorID,pRspInfo.ErrorMsg,str(pRspInfo),bIsLast))
         #self.agent.rsp_order_insert(pInputOrder.OrderRef,pInputOrder.InstrumentID,pRspInfo.ErrorID,pRspInfo.ErrorMsg)
         self.agent.err_order_insert(pInputOrder.OrderRef,pInputOrder.InstrumentID,pRspInfo.ErrorID,pRspInfo.ErrorMsg)
@@ -541,7 +540,7 @@ class TraderSpiDelegate(TraderSpi):
             这个回报因为没有request_id,所以没办法对应
         '''
         print u'ERROR Order Insert'
-        self.logger.warning(u'交易所报单录入错误回报, 正常后不应该出现,rspInfo=%s'%(str(pRspInfo),))
+        self.logger.warning(u'TD:交易所报单录入错误回报, 正常后不应该出现,rspInfo=%s'%(str(pRspInfo),))
         self.agent.err_order_insert(pInputOrder.OrderRef,pInputOrder.InstrumentID,pRspInfo.ErrorID,pRspInfo.ErrorMsg)
     
     def OnRtnOrder(self, pOrder):
@@ -554,25 +553,25 @@ class TraderSpiDelegate(TraderSpi):
         if pOrder.OrderStatus == 'a':
             #CTP接受，但未发到交易所
             #print u'CTP接受Order，但未发到交易所, BrokerID=%s,BrokerOrderSeq = %s,TraderID=%s, OrderLocalID=%s' % (pOrder.BrokerID,pOrder.BrokerOrderSeq,pOrder.TraderID,pOrder.OrderLocalID)
-            self.logger.info(u'CTP接受Order，但未发到交易所, BrokerID=%s,BrokerOrderSeq = %s,TraderID=%s, OrderLocalID=%s' % (pOrder.BrokerID,pOrder.BrokerOrderSeq,pOrder.TraderID,pOrder.OrderLocalID))
+            self.logger.info(u'TD:CTP接受Order，但未发到交易所, BrokerID=%s,BrokerOrderSeq = %s,TraderID=%s, OrderLocalID=%s' % (pOrder.BrokerID,pOrder.BrokerOrderSeq,pOrder.TraderID,pOrder.OrderLocalID))
             self.agent.rtn_order(pOrder)
         else:
             #print u'交易所接受Order,exchangeID=%s,OrderSysID=%s,TraderID=%s, OrderLocalID=%s' % (pOrder.ExchangeID,pOrder.OrderSysID,pOrder.TraderID,pOrder.OrderLocalID)
-            self.logger.info(u'交易所接受Order,exchangeID=%s,OrderSysID=%s,TraderID=%s, OrderLocalID=%s' % (pOrder.ExchangeID,pOrder.OrderSysID,pOrder.TraderID,pOrder.OrderLocalID))
+            self.logger.info(u'TD:交易所接受Order,exchangeID=%s,OrderSysID=%s,TraderID=%s, OrderLocalID=%s' % (pOrder.ExchangeID,pOrder.OrderSysID,pOrder.TraderID,pOrder.OrderLocalID))
             #self.agent.rtn_order_exchange(pOrder)
             self.agent.rtn_order(pOrder)
 
     def OnRtnTrade(self, pTrade):
         '''成交通知'''
-        print u'成交通知,BrokerID=%s,BrokerOrderSeq = %s,exchangeID=%s,OrderSysID=%s,TraderID=%s, OrderLocalID=%s' %(pTrade.BrokerID,pTrade.BrokerOrderSeq,pTrade.ExchangeID,pTrade.OrderSysID,pTrade.TraderID,pTrade.OrderLocalID)
-        self.logger.info(u'成交回报,Trade=%s' % repr(pTrade))
+        self.logger.info(u'TD:成交通知,BrokerID=%s,BrokerOrderSeq = %s,exchangeID=%s,OrderSysID=%s,TraderID=%s, OrderLocalID=%s' %(pTrade.BrokerID,pTrade.BrokerOrderSeq,pTrade.ExchangeID,pTrade.OrderSysID,pTrade.TraderID,pTrade.OrderLocalID))
+        self.logger.info(u'TD:成交回报,Trade=%s' % repr(pTrade))
         self.agent.rtn_trade(pTrade)
 
     def OnRspOrderAction(self, pInputOrderAction, pRspInfo, nRequestID, bIsLast):
         '''
             ctp撤单校验错误
         '''
-        self.logger.warning(u'CTP撤单录入错误回报, 正常后不应该出现,rspInfo=%s'%(str(pRspInfo),))
+        self.logger.warning(u'TD:CTP撤单录入错误回报, 正常后不应该出现,rspInfo=%s'%(str(pRspInfo),))
         #self.agent.rsp_order_action(pInputOrderAction.OrderRef,pInputOrderAction.InstrumentID,pRspInfo.ErrorID,pRspInfo.ErrorMsg)
         self.agent.err_order_action(pInputOrderAction.OrderRef,pInputOrderAction.InstrumentID,pRspInfo.ErrorID,pRspInfo.ErrorMsg)
 
@@ -581,7 +580,7 @@ class TraderSpiDelegate(TraderSpi):
             交易所撤单操作错误回报
             正常情况后不应该出现
         '''
-        self.logger.warning(u'交易所撤单录入错误回报, 可能已经成交,rspInfo=%s'%(str(pRspInfo),))
+        self.logger.warning(u'TD:交易所撤单录入错误回报, 可能已经成交,rspInfo=%s'%(str(pRspInfo),))
         self.agent.err_order_action(pOrderAction.OrderRef,pOrderAction.InstrumentID,pRspInfo.ErrorID,pRspInfo.ErrorMsg)
 
 
@@ -595,7 +594,7 @@ class c_instrument(object):
         objs = dict([(name,c_instrument(name)) for name in names])
         for item in strategy.values():
             if item.name not in objs:
-                print u'策略针对合约%s不在盯盘列表中' % (item.name,)
+                logging.warning(u'策略针对合约%s不在盯盘列表中' % (item.name,))
                 continue
             objs[item.name].max_volume = item.max_volume #
             #objs[item.name].strategy = dict([(ss.get_name(),ss) for ss in item[1:]])
@@ -687,7 +686,7 @@ class AbsAgent(object):
         ii = bisect.bisect(cticks,trigger_tick)
         #print 'trigger_tick=%s,cticks=%s,len(command)=%s' % (trigger_tick,str(cticks),len(self.commands))
         self.commands.insert(ii,(trigger_tick,command))
-        print 'trigger_tick=%s,cticks=%s,len(command)=%s' % (trigger_tick,str(cticks),len(self.commands))
+        logging.debug(u'AA_P:trigger_tick=%s,cticks=%s,len(command)=%s' % (trigger_tick,str(cticks),len(self.commands)))
 
     def check_commands(self):   
         '''
@@ -701,7 +700,7 @@ class AbsAgent(object):
         #    pass
         #    print 'in check command,len=%s,self.tick=%s,command time=%s' % (l,self.tick,self.commands[-1][0])
         while(i<l and self.tick >= self.commands[i][0]):
-            print 'exec command,i=%s,tick=%s,command[i][0]=%s' % (i,self.tick,self.commands[i][0])
+            logging.debug(u'AA_C:exec command,i=%s,tick=%s,command[i][0]=%s' % (i,self.tick,self.commands[i][0]))
             self.commands[i][1]()
             i += 1
         if i>0:
@@ -830,26 +829,26 @@ class Agent(AbsAgent):
     ##内务处理
     def fetch_trading_account(self):
         #获取资金帐户
-        print u'获取资金帐户..'
+        logging.info(u'A:获取资金帐户..')
         req = ustruct.QryTradingAccount(BrokerID=self.cuser.broker_id, InvestorID=self.cuser.investor_id)
         r=self.trader.ReqQryTradingAccount(req,self.inc_request_id())
-        print u'查询资金账户, 函数发出返回值:%s' % r
+        logging.info(u'A:查询资金账户, 函数发出返回值:%s' % r)
 
     def fetch_investor_position(self,instrument_id):
         #获取合约的当前持仓
-        print u'获取合约%s的当前持仓..' % (instrument_id,)
+        logging.info(u'A:获取合约%s的当前持仓..' % (instrument_id,))
         req = ustruct.QryInvestorPosition(BrokerID=self.cuser.broker_id, InvestorID=self.cuser.investor_id,InstrumentID=instrument_id)
         r=self.trader.ReqQryInvestorPosition(req,self.inc_request_id())
-        print u'查询持仓, 函数发出返回值:%s' % r
+        logging.info(u'A:查询持仓, 函数发出返回值:%s' % rP)
     
     def fetch_investor_position_detail(self,instrument_id):
         '''
             获取合约的当前持仓明细，目前没用
         '''
-        print u'获取合约%s的当前持仓..' % (instrument_id,)
+        logging.info(u'A:获取合约%s的当前持仓..' % (instrument_id,))
         req = ustruct.QryInvestorPositionDetail(BrokerID=self.cuser.broker_id, InvestorID=self.cuser.investor_id,InstrumentID=instrument_id)
         r=self.trader.ReqQryInvestorPositionDetail(req,self.inc_request_id())
-        print u'查询持仓, 函数发出返回值:%s' % r
+        logging.info(u'A:查询持仓, 函数发出返回值:%s' % r)
 
     def fetch_instrument_marginrate(self,instrument_id):
         req = ustruct.QryInstrumentMarginRate(BrokerID=self.cuser.broker_id,
@@ -858,14 +857,14 @@ class Agent(AbsAgent):
                         HedgeFlag = utype.THOST_FTDC_HF_Speculation
                 )
         r = self.trader.ReqQryInstrumentMarginRate(req,self.inc_request_id())
-        print u'查询保证金率, 函数发出返回值:%s' % r
+        logging.info(u'A:查询保证金率, 函数发出返回值:%s' % r)
 
     def fetch_instrument(self,instrument_id):
         req = ustruct.QryInstrument(
                         InstrumentID=instrument_id,
                 )
         r = self.trader.ReqQryInstrument(req,self.inc_request_id())
-        print u'查询合约, 函数发出返回值:%s' % r
+        logging.info(u'A:查询合约, 函数发出返回值:%s' % r)
 
     def fetch_instruments_by_exchange(self,exchange_id):
         '''不能单独用exchange_id,因此没有意义
@@ -874,7 +873,7 @@ class Agent(AbsAgent):
                         ExchangeID=exchange_id,
                 )
         r = self.trader.ReqQryInstrument(req,self.inc_request_id())
-        print u'查询合约, 函数发出返回值:%s' % r
+        logging.info(u'A:查询合约, 函数发出返回值:%s' % r)
 
     ##交易处理
     def RtnTick(self,ctick):#行情处理主循环
@@ -931,7 +930,7 @@ class Agent(AbsAgent):
                 self.save_min(dinst)
             '''
             last_current_time = hreader.read_current_last_c(dinst.name,self.scur_day).time
-            print 'time:',last_current_time,last_min
+            logging.info(u'A_DF:cur_time=%s,last_min=%s' %(last_current_time,last_min))
             if last_current_time < last_min:    #如果已经有当分钟的记录，就不再需要保存了。
                 self.save_min(dinst)  
             #print 'in day_finalize'
@@ -1084,8 +1083,7 @@ class Agent(AbsAgent):
         #print 'in check_open_signal'
         signals = []
         if ctick.instrument not in self.instruments:
-            self.logger.warning(u'需要监控的%s未记录行情数据')
-            print u'需要监控的%s未记录行情数据'
+            self.logger.warning(u'A_COS:需要监控的%s未记录行情数据')
             return signals
         cur_inst = self.instruments[ctick.instrument]
         for ss in cur_inst.strategy.values():
@@ -1120,12 +1118,11 @@ class Agent(AbsAgent):
         if want_volume <= 0:
             return (0,0)
         margin_amount = instrument.calc_margin_amount(order.target_price,order.position.strategy.direction)
-        print 'want_volume:%s,margin_amount:%s' % (want_volume,margin_amount)
+        logging.info('A_COV:want_volume:%s,margin_amount:%s' % (want_volume,margin_amount))
         if margin_amount <= 1:#不可能只有1块钱
             self.logger.error(u'合约%s保证金率未初始化' % (instrument.name,))
-            print u'合约%s保证金率未初始化' % (instrument.name,)
         available_volume = int(self.available / margin_amount)
-        print 'int(self.available=%s,margin_amount=%s' % (int(self.available),margin_amount)
+        logging.info(u'A_COV:int(self.available=%s,margin_amount=%s' % (int(self.available),margin_amount))
         if available_volume == 0:
             return (0,0)
         if want_volume > available_volume:
@@ -1152,7 +1149,7 @@ class Agent(AbsAgent):
                 ##初始化止损类
                 order.stoper = order.position.strategy.closer(order.instrument.data,order.base_price)
                 order.position.add_order(order)
-                print 'cur_tick=%s,valid_length=%s' % (self.get_tick(),order.position.strategy.opener.valid_length,)
+                logging.info(u'A_MC:cur_tick=%s,valid_length=%s' % (self.get_tick(),order.position.strategy.opener.valid_length,))
                 self.put_command(self.get_tick()+order.position.strategy.opener.valid_length,fcustom(self.cancel_command,command=command))
                 self.open_position(command)
             else:#平仓, Y跳后不论是否成功均撤单, 撤单应该比开仓更快，避免追不上
@@ -1219,7 +1216,7 @@ class Agent(AbsAgent):
             发出撤单指令
         '''
         #print 'in cancel command'
-        print u'取消命令'
+        self.logger.info(u'A_CC:取消命令')
         req = ustruct.InputOrderAction(
                 InstrumentID = command.instrument,
                 OrderRef = str(command.order_ref),
@@ -1283,9 +1280,9 @@ class Agent(AbsAgent):
                    在OnTrade中进行position的细致处理 
             #TODO: 必须处理策略分类持仓汇总和持仓总数不匹配时的问题
         '''
-        print u'in rtn_trade,orderref=%s,orders=%s,instruments=%s' % (strade.OrderRef,self.transmitting_orders,self.instruments)
+        logging.info(u'A_RT1:in rtn_trade,orderref=%s,orders=%s,instruments=%s' % (strade.OrderRef,self.transmitting_orders,self.instruments))
         if int(strade.OrderRef) not in self.transmitting_orders or strade.InstrumentID not in self.instruments:
-            self.logger.warning(u'收到非本程序发出的成交回报:%s-%s' % (strade.InstrumentID,strade.OrderRef))
+            self.logger.warning(u'A_RT2:收到非本程序发出的成交回报:%s-%s' % (strade.InstrumentID,strade.OrderRef))
         cur_inst = self.instruments[strade.InstrumentID]
         myorder = self.transmitting_orders[int(strade.OrderRef)]
         if myorder.action_type == XOPEN:#开仓, 也可用pTrade.OffsetFlag判断
@@ -1365,7 +1362,7 @@ class Agent(AbsAgent):
             这里的保证金率应该是和期货公司无关，所以不能使用
         '''
         if pinstrument.InstrumentID not in self.instruments:
-            self.logger.warning(u'收到未监控的合约查询:%s' % (pinstrument.InstrumentID))
+            self.logger.warning(u'A_RQI:收到未监控的合约查询:%s' % (pinstrument.InstrumentID))
             return
         self.instruments[pinstrument.InstrumentID].multiple = pinstrument.VolumeMultiple
         self.instruments[pinstrument.InstrumentID].tick_base = int(pinstrument.PriceTick * 10 + 0.1)
