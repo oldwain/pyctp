@@ -17,6 +17,8 @@ TODO:   为真实起见，在mock中采用Command模式
 '''
 
 import time
+import logging
+
 import hreader
 import agent
 import config
@@ -32,7 +34,7 @@ class TraderMock(object):
 
     def ReqOrderInsert(self, order, request_id):
         '''报单录入请求, 需要调用成交函数'''
-        print 'in order insert'
+        logging.info(u'报单')
         oid = order.OrderRef
         trade = ustruct.Trade(
                     InstrumentID = order.InstrumentID,
@@ -59,17 +61,17 @@ class TraderMock(object):
         self.myagent.rtn_order(rorder)
 
     def ReqQryTradingAccount(self,req,req_id=0):
-        print u'in query account'
+        logging.info(u'查询帐户余额')
         account = BaseObject(Available=1000000) #测试余额总是100W
         self.myagent.rsp_qry_trading_account(account)
 
     def ReqQryInstrument(self,req,req_id=0):#只有唯一一个合约
-        print u'in query instrument'
+        logging.info(u'查询合约')
         ins = BaseObject(InstrumentID = req.InstrumentID,VolumeMultiple = 300,PriceTick=0.2)
         self.myagent.rsp_qry_instrument(ins)
 
     def ReqQryInstrumentMarginRate(self,req,req_id=0):
-        print u'in query marinrate'
+        logging.info(u'查询保证金')
         mgr = BaseObject(InstrumentID = req.InstrumentID,LongMarginRatioByMoney=0.17,ShortMarginRatioByMoney=0.17)
         self.myagent.rsp_qry_instrument_marginrate(mgr)
 
@@ -110,8 +112,6 @@ class SaveMock(object):
             self.agent.RtnTick(tick)
             #self.agent.RtnTick(tick)
 
-
-import logging
 
 class NULLAgent(object):
     #只用于为行情提供桩

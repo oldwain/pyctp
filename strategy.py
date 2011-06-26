@@ -99,10 +99,18 @@ class Position(object):
         self.opened_volume = 0
         self.locked_volume = 0  #被当前头寸锁定的(包括持仓的和发出未成交的)
 
-    def calc_open_volume(self):   #用来计算Position的当次可开仓数
+    def calc_open_volume(self):   
+        '''
+            计算Position的当次可开仓数. 与保证金无关，只计算理论数
+            1. 计算当前策略的剩余可开仓数
+            2. 计算当前合约的剩余可开仓数
+            3. 获取策略的单次开仓数
+            取1,2,3的小者
+
+        '''
         #print 'self.strategy.max_holding:%s' % (self.strategy.max_holding,)
         #print 'in calc_open_volume,self=%s,self.name=%s' % (str(self),self.instrument.name)
-        logging.info(u'PA:计算头寸可开仓数,合约=%s,头寸=%s' % (self.instrument.name,str(self)))
+        logging.info(u'P_COV_1:计算头寸可开仓数,%s:Pos=%s' % (self.instrument.name,str(self)))
         self.re_calc()
         #剩余开仓总数 = 策略持仓限量 - 已开仓数，若小于0则为0
         remained = self.strategy.max_holding - self.locked_volume if self.strategy.max_holding > self.locked_volume else 0
@@ -113,6 +121,7 @@ class Position(object):
             remained = inst_remained
         #本次可开仓数 = 策略单次开仓数 和 剩余开仓总数 的小者
         #print 'self.strategy.open_volume:%s' % (self.strategy.open_volume,)
+        logging.info(u'P_COV_2:计算头寸可开仓数完成,%s:Pos=%s' % (self.instrument.name,str(self)))
         return self.strategy.open_volume if self.strategy.open_volume <=  remained else remained
 
     def re_calc(self): #
@@ -124,14 +133,14 @@ class Position(object):
         self.opened_volume = sum([order.opened_volume for order in self.orders])
         self.locked_volume = sum([order.volume for order in self.orders])
         #print u'in re_calc:opened=%s,locked=%s,self.strategy.name=%s' % (self.opened_volume,self.locked_volume,type_name(self.strategy.opener))
-        logging.info(u'P_AB_1:重新计算头寸，开仓数=%s 锁定数=%s,%s' % (self.opened_volume,self.locked_volume,str(self)))
+        logging.info(u'P_RC_1:重新计算头寸，开仓数=%s 锁定数=%s,%s' % (self.opened_volume,self.locked_volume,str(self)))
 
     def add_order(self,order):
         self.orders.append(order)
 
-    def get_locked_volume(self):    #回复已经占用数
+    def get_locked_volume(self):    #返回已经占用数
         #print u'in get locked volume self=%s,self.name=%s' % (str(self),self.instrument.name)
-        logging.info(u'PB:获取头寸的锁定数...,%s' % str(self))
+        logging.info(u'P_GLV:获取头寸的锁定数...,%s' % str(self))
         self.re_calc()
         return self.locked_volume
 
