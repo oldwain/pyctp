@@ -636,7 +636,10 @@ class c_instrument(object):
         locked_volume = 0
         for position in self.position_detail.values():
             locked_volume += position.get_locked_volume()
-        return self.max_volume - locked_volume if self.max_volume > locked_volume else 0
+            logging.info(u'计算策略锁定量: pos:%s,locked_volume=%s' % (position,position.get_locked_volume()))
+        remained_volume = self.max_volume - locked_volume if self.max_volume > locked_volume else 0
+        logging.info(u'A_CRV2:%s合约总锁定数=%s,合约最大允许数=%s,剩余可开仓数=%s' % (self.name,locked_volume,self.max_volume,remained_volume))
+        return remained_volume
 
     def calc_margin_amount(self,price,direction):   
         '''
@@ -721,7 +724,8 @@ class Agent(AbsAgent):
         ##计时, 用来激发队列
         ##
         self.trader = trader
-        self.trader.myagent = self
+        #self.trader.myagent = self
+        trader.initialize(self)
         self.cuser = cuser
         self.strategy = my_strategy
         self.instruments = c_instrument.create_instruments(instruments,my_strategy)
@@ -809,7 +813,7 @@ class Agent(AbsAgent):
             time.sleep(1)   #这个只用于非行情期的执行. 
             self.qry_commands[0]()
             del self.qry_commands[0]
-        print u'查询命令序列长度:',len(self.qry_commands)
+        logging.debug(u'查询命令序列长度:%s' % (len(self.qry_commands),))
 
 
     def prepare_data_env(self):
@@ -832,14 +836,14 @@ class Agent(AbsAgent):
         logging.info(u'A:获取资金帐户..')
         req = ustruct.QryTradingAccount(BrokerID=self.cuser.broker_id, InvestorID=self.cuser.investor_id)
         r=self.trader.ReqQryTradingAccount(req,self.inc_request_id())
-        logging.info(u'A:查询资金账户, 函数发出返回值:%s' % r)
+        #logging.info(u'A:查询资金账户, 函数发出返回值:%s' % r)
 
     def fetch_investor_position(self,instrument_id):
         #获取合约的当前持仓
         logging.info(u'A:获取合约%s的当前持仓..' % (instrument_id,))
         req = ustruct.QryInvestorPosition(BrokerID=self.cuser.broker_id, InvestorID=self.cuser.investor_id,InstrumentID=instrument_id)
         r=self.trader.ReqQryInvestorPosition(req,self.inc_request_id())
-        logging.info(u'A:查询持仓, 函数发出返回值:%s' % rP)
+        #logging.info(u'A:查询持仓, 函数发出返回值:%s' % rP)
     
     def fetch_investor_position_detail(self,instrument_id):
         '''
@@ -848,7 +852,7 @@ class Agent(AbsAgent):
         logging.info(u'A:获取合约%s的当前持仓..' % (instrument_id,))
         req = ustruct.QryInvestorPositionDetail(BrokerID=self.cuser.broker_id, InvestorID=self.cuser.investor_id,InstrumentID=instrument_id)
         r=self.trader.ReqQryInvestorPositionDetail(req,self.inc_request_id())
-        logging.info(u'A:查询持仓, 函数发出返回值:%s' % r)
+        #logging.info(u'A:查询持仓, 函数发出返回值:%s' % r)
 
     def fetch_instrument_marginrate(self,instrument_id):
         req = ustruct.QryInstrumentMarginRate(BrokerID=self.cuser.broker_id,
@@ -1043,7 +1047,7 @@ class Agent(AbsAgent):
         '''
         signals = []
         if ctick.instrument not in self.instruments:
-            self.logger.warning(u'需要监控的%s未记录行情数据')
+            logging.warning(u'需要监控的%s未记录行情数据')
             print u'需要监控的%s未记录行情数据'
             return signals
         cur_inst = self.instruments[ctick.instrument]
@@ -1083,7 +1087,7 @@ class Agent(AbsAgent):
         #print 'in check_open_signal'
         signals = []
         if ctick.instrument not in self.instruments:
-            self.logger.warning(u'A_COS:需要监控的%s未记录行情数据')
+            logging.warning(u'A_COS:需要监控的%s未记录行情数据')
             return signals
         cur_inst = self.instruments[ctick.instrument]
         for ss in cur_inst.strategy.values():
@@ -1099,34 +1103,48 @@ class Agent(AbsAgent):
                                 mytime = ctick.time,
                                 action_type=XOPEN,
                             )
-                candidate.volume,margin_amount = self.calc_open_volume(cur_inst,candidate)
+                ##这里不处理保证金，直接使用理论开仓数。后面在实际开仓时才处理
+                #candidate.volume,margin_amount = self.calc_open_volume(cur_inst,candidate)
+                candidate.volume = self.calc_open_volume_pre(cur_inst,candidate)
                 #print 'candidate volume:',candidate.volume
-                if candidate.volume > 0:
-                    self.available -= (candidate.volume *margin_amount)  #锁定保证金
-                    signals.append(candidate)
+                #if candidate.volume > 0:
+                #    self.available -= (candidate.volume *margin_amount)  #锁定保证金
+                #    signals.append(candidate)
+                signals.append(candidate)    
         return signals
 
-    def calc_open_volume(self,instrument,order):
+    def calc_open_volume_pre(self,instrument,order):
+        '''
+            计算order的理论开仓数(基于策略)
+        '''
+        return order.position.calc_open_volume()
+
+
+    def lock_open_volume(self,instrument,order):
         '''
             计算order的可开仓数
             instrument: 合约对象
 
-            先计算理论可开数，然后根据可用保证金调整
+            先计算理论可开数，然后根据可用保证金调整. 并虚拟锁定保证金
         '''
         want_volume = order.position.calc_open_volume()
+        inst_remained = order.instrument.calc_remained_volume()
+        if want_volume > inst_remained:
+            want_volume = inst_remained
         if want_volume <= 0:
-            return (0,0)
+            return 0
         margin_amount = instrument.calc_margin_amount(order.target_price,order.position.strategy.direction)
-        logging.info(u'A_COV:理论开仓数:%s,单手保证金:%s' % (want_volume,margin_amount))
+        logging.debug(u'A_COV:理论开仓数:%s,单手保证金:%s' % (want_volume,margin_amount))
         if margin_amount <= 1:#不可能只有1块钱
-            self.logger.error(u'合约%s保证金率未初始化' % (instrument.name,))
+            logging.error(u'合约%s保证金率未初始化' % (instrument.name,))
         available_volume = int(self.available / margin_amount)
-        logging.info(u'A_COV:可用保证金=%s,单手保证金=%s' % (int(self.available),margin_amount))
+        logging.debug(u'A_COV:可用保证金=%s,单手保证金=%s' % (int(self.available),margin_amount))
         if available_volume == 0:
-            return (0,0)
+            return 0
         if want_volume > available_volume:
             want_volume = available_volume
-        return want_volume,margin_amount
+        self.available -= (want_volume *margin_amount)  #保证金虚拟锁定，在成交后解锁(必须是全部成交)或撤单后解锁
+        return want_volume
 
     def make_command(self,orders):
         '''
@@ -1144,10 +1162,19 @@ class Agent(AbsAgent):
                     action_type = order.action_type,
                 )
             if order.action_type == XOPEN:##开仓情况,X跳后不论是否成功均撤单
+                #需要处理实际可开数和保证金虚拟锁定
+                #...........开始计算
+                order.volume = self.lock_open_volume(order.instrument,order) #计算可开数并锁住相应保证金(会在后面的成交后查询中解锁)
+                if order.volume == 0:
+                    logging.info(u'策略%s,可下单数=0,中止' % (order.position,))
+                    continue
+                ##有效Order
+                command.volume = order.volume
                 self.transmitting_orders[command.order_ref] = order
                 ##初始化止损类
                 order.stoper = order.position.strategy.closer(order.instrument.data,order.base_price)
                 order.position.add_order(order)
+                #............ 加锁完毕. 这样，同一instrument本时刻再有其它策略的开仓时，其calc_remained_volume能返回合适值
                 logging.info(u'A_MC:当前tick=%s,下单有效时长(超过该时长未成交则撤单)=%s' % (self.get_tick(),order.position.strategy.opener.valid_length,))
                 self.put_command(self.get_tick()+order.position.strategy.opener.valid_length,fcustom(self.cancel_command,command=command))
                 self.open_position(command)
@@ -1181,6 +1208,7 @@ class Agent(AbsAgent):
                 UserForceClose = 0,
                 TimeCondition = utype.THOST_FTDC_TC_GFD,
             )
+        logging.info(u'下单: instrument=%s,方向=%s,数量=%s,价格=%s' % (order.instrument,u'多' if order.direction==utype.THOST_FTDC_D_Buy else u'空',order.volume,order.price))
         r = self.trader.ReqOrderInsert(req,self.inc_request_id())
 
 
@@ -1215,7 +1243,7 @@ class Agent(AbsAgent):
             发出撤单指令
         '''
         #print 'in cancel command'
-        self.logger.info(u'A_CC:取消命令')
+        logging.info(u'A_CC:取消命令')
         req = ustruct.InputOrderAction(
                 InstrumentID = command.instrument,
                 OrderRef = str(command.order_ref),
@@ -1281,17 +1309,19 @@ class Agent(AbsAgent):
         '''
         logging.info(u'A_RT1:成交回报,%s:orderref=%s,orders=%s' % (self.instruments,strade.OrderRef,self.transmitting_orders))
         if int(strade.OrderRef) not in self.transmitting_orders or strade.InstrumentID not in self.instruments:
-            self.logger.warning(u'A_RT2:收到非本程序发出的成交回报:%s-%s' % (strade.InstrumentID,strade.OrderRef))
+            logging.warning(u'A_RT2:收到非本程序发出的成交回报:%s-%s' % (strade.InstrumentID,strade.OrderRef))
         cur_inst = self.instruments[strade.InstrumentID]
         myorder = self.transmitting_orders[int(strade.OrderRef)]
         if myorder.action_type == XOPEN:#开仓, 也可用pTrade.OffsetFlag判断
-            myorder.on_trade(price=int(strade.Price*10+0.1),volume=strade.Volume,trade_time=strade.TradeTime)
+            is_completed = myorder.on_trade(price=int(strade.Price*10+0.1),volume=strade.Volume,trade_time=strade.TradeTime)
         else:
             myorder.source_order.on_close(price=int(strade.Price*10+0.1),volume=strade.Volume,trade_time=strade.TradeTime)
         self.save_state()
         ##查询可用资金
         #print 'fetch_trading_account'
-        self.put_command(self.get_tick()+1,self.fetch_trading_account)
+        #if myorder.action_type == XCLOSE or is_completed:#平仓或者开仓完全成交
+        #    self.put_command(self.get_tick()+1,self.fetch_trading_account)
+        self.put_command(self.get_tick()+1,self.fetch_trading_account)  #不完全成交也可以，也就是多查询几次。有可能被抑制
 
 
     def rtn_order(self,sorder):
@@ -1361,7 +1391,7 @@ class Agent(AbsAgent):
             这里的保证金率应该是和期货公司无关，所以不能使用
         '''
         if pinstrument.InstrumentID not in self.instruments:
-            self.logger.warning(u'A_RQI:收到未监控的合约查询:%s' % (pinstrument.InstrumentID))
+            logging.warning(u'A_RQI:收到未监控的合约查询:%s' % (pinstrument.InstrumentID))
             return
         self.instruments[pinstrument.InstrumentID].multiple = pinstrument.VolumeMultiple
         self.instruments[pinstrument.InstrumentID].tick_base = int(pinstrument.PriceTick * 10 + 0.1)

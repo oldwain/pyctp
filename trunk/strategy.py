@@ -42,20 +42,23 @@ class Order(object):
         assert action_type == XOPEN,u'操作类型必须是开仓'
         self.action_type = action_type
         ##
-        self.volume = 0 #目标成交手数
+        self.volume = 0 #目标成交手数,锁定总数
         self.opened_volume = 0  #实际成交手数
         self.stoper = None
         self.trader_detail = []
         self.cancelled = False  #是否已经撤单
 
     def on_trade(self,price,volume,trade_time):
-        #print u'price=%s,volume=%s,trade_time=%s' % (price,volume,trade_time)
+        ''' 返回是否完全成交
+        '''
+        logging.info(u'成交纪录:price=%s,volume=%s,trade_time=%s' % (price,volume,trade_time))
         self.opened_volume += volume
         if self.volume < self.opened_volume:    #因为cancel和成交的时间差导致的
             self.volume = self.opened_volume
         logging.info(u'price=%s,volume=%s,self.opened_volume=%s,is_closed=%s' % (price,volume,self.opened_volume,self.is_closed()))
         self.trader_detail.append((price,volume,trade_time))
         self.position.re_calc()
+        return self.opened_volume == self.volume
         
     def on_close(self,price,volume,trade_time):
         self.opened_volume -= volume
@@ -115,14 +118,15 @@ class Position(object):
         #剩余开仓总数 = 策略持仓限量 - 已开仓数，若小于0则为0
         remained = self.strategy.max_holding - self.locked_volume if self.strategy.max_holding > self.locked_volume else 0
         #print 'remained:%s' % (remained,)
-        inst_remained = self.instrument.calc_remained_volume()
+        #inst_remained = self.instrument.calc_remained_volume() #因为机制原因，计算信号时没有办法确定同期锁定的数量. 故不再这里约束
         #print 'remained:%s,inst_remained:%s' % (remained,inst_remained)
-        if remained > inst_remained:
-            remained = inst_remained
+        #if remained > inst_remained:
+        #    remained = inst_remained
         #本次可开仓数 = 策略单次开仓数 和 剩余开仓总数 的小者
         #print 'self.strategy.open_volume:%s' % (self.strategy.open_volume,)
-        logging.info(u'P_COV_2:计算头寸可开仓数完成,%s:Pos=%s' % (self.instrument.name,str(self)))
-        return self.strategy.open_volume if self.strategy.open_volume <=  remained else remained
+        can_open = self.strategy.open_volume if self.strategy.open_volume <=  remained else remained
+        logging.info(u'P_COV_2:计算头寸可开仓数完成,可开数=%s,%s:Pos=%s' % (can_open,self.instrument.name,str(self)))
+        return can_open
 
     def re_calc(self): #
         #print self.orders
@@ -133,14 +137,15 @@ class Position(object):
         self.opened_volume = sum([order.opened_volume for order in self.orders])
         self.locked_volume = sum([order.volume for order in self.orders])
         #print u'in re_calc:opened=%s,locked=%s,self.strategy.name=%s' % (self.opened_volume,self.locked_volume,type_name(self.strategy.opener))
-        logging.info(u'P_RC_1:重新计算头寸，开仓数=%s 锁定数=%s,%s' % (self.opened_volume,self.locked_volume,str(self)))
+        logging.info(u'P_RC_1:重新计算头寸，开仓数=%s 策略总锁定数=%s,%s' % (self.opened_volume,self.locked_volume,str(self)))
 
     def add_order(self,order):
         self.orders.append(order)
 
     def get_locked_volume(self):    #返回已经占用数
         #print u'in get locked volume self=%s,self.name=%s' % (str(self),self.instrument.name)
-        logging.info(u'P_GLV:获取头寸的锁定数...,%s' % str(self))
+        logging.info(u'P_GLV:获取头寸策略的总锁定数...,%s' % str(self))
+        #总锁定数 = 开仓数 + 未成交的下单数
         self.re_calc()
         return self.locked_volume
 
