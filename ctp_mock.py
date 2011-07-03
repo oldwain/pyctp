@@ -29,8 +29,9 @@ import UserApiType as utype
 from base import *
 
 class TraderMock(object):
-    def initialze(self,myagent):
+    def initialize(self,myagent):
         self.myagent = myagent
+        self.available = 1000000    #初始100W
 
     def ReqOrderInsert(self, order, request_id):
         '''报单录入请求, 需要调用成交函数'''
@@ -48,6 +49,10 @@ class TraderMock(object):
                     OrderLocalID = oid,
                     TradeTime = time.strftime('%H%M%S'),#只有备案作用
                 )
+        if order.CombOffsetFlag == utype.THOST_FTDC_OF_Open:#开仓. 为方便起见,假设都是股指
+            self.available -= order.LimitPrice * 300 * 0.17
+        else:
+            self.available += order.LimitPrice * 300 * 0.17
         self.myagent.rtn_trade(trade)
 
     def ReqOrderAction(self, corder, request_id):
@@ -62,7 +67,7 @@ class TraderMock(object):
 
     def ReqQryTradingAccount(self,req,req_id=0):
         logging.info(u'查询帐户余额')
-        account = BaseObject(Available=1000000) #测试余额总是100W
+        account = BaseObject(Available=self.available) 
         self.myagent.rsp_qry_trading_account(account)
 
     def ReqQryInstrument(self,req,req_id=0):#只有唯一一个合约
@@ -162,7 +167,6 @@ class NULLAgent(object):
 
 def create_agent_with_mocktrader(instrument,tday):
     trader = TraderMock()
-    
     strategy_cfg = config.parse_strategy()
 
     ##这里没有考虑现场恢复，state中需注明当日
@@ -181,7 +185,7 @@ def run_ticks(ticks,myagent):
         myagent.RtnTick(tick)
 
 def log_config():
-    config_logging('ctp_trade_mock.log')
+    config_logging('ctp_trade_mock.log',console_level=logging.INFO)
 
 def trade_mock(instrument='IF1104'):
     #logging.basicConfig(filename="ctp_trade_mock.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
@@ -195,4 +199,9 @@ def trade_mock(instrument='IF1104'):
     #    myagent.inc_tick()
     #    myagent.RtnTick(tick)
     run_ticks(ticks,myagent)
+
+
+if __name__ == '__main__':
+    log_config()
+    trade_mock()
 
