@@ -69,7 +69,7 @@ class Order(object):
     def on_cancel(self):    #已经撤单
         self.cancelled = True
         self.volume = self.opened_volume    #不会再有成交回报
-        logging.info('on cancel')
+        logging.debug('O_OC:on cancel')
         self.position.re_calc()
 
     def is_closed(self): #是否已经完全平仓
@@ -137,7 +137,7 @@ class Position(object):
         self.opened_volume = sum([order.opened_volume for order in self.orders])
         self.locked_volume = sum([order.volume for order in self.orders])
         #print u'in re_calc:opened=%s,locked=%s,self.strategy.name=%s' % (self.opened_volume,self.locked_volume,type_name(self.strategy.opener))
-        logging.info(u'P_RC_1:重新计算头寸，开仓数=%s 策略总锁定数=%s,%s' % (self.opened_volume,self.locked_volume,str(self)))
+        logging.info(u'P_RC_1:重算头寸，已开数=%s 策略总锁定数=%s,%s' % (self.opened_volume,self.locked_volume,str(self)))
 
     def add_order(self,order):
         self.orders.append(order)
@@ -147,7 +147,7 @@ class Position(object):
         logging.info(u'P_GLV:获取头寸策略的总锁定数...,%s' % str(self))
         #总锁定数 = 开仓数 + 未成交的下单数
         self.re_calc()
-        return self.locked_volume
+        return self.locked_volume,self.opened_volume
 
     def __str__(self):
         return u'%s:%s:%x' % (self.instrument.name,type_name(self.strategy.opener),id(self))

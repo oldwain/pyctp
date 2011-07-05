@@ -53,7 +53,7 @@ class TraderMock(object):
             self.available -= order.LimitPrice * 300 * 0.17
         else:
             self.available += order.LimitPrice * 300 * 0.17
-        self.myagent.rtn_trade(trade)
+        #self.myagent.rtn_trade(trade)
 
     def ReqOrderAction(self, corder, request_id):
         '''撤单请求'''
@@ -62,6 +62,7 @@ class TraderMock(object):
         rorder = ustruct.Order(
                     InstrumentID = corder.InstrumentID,
                     OrderRef = corder.OrderRef,
+                    OrderStatus = utype.THOST_FTDC_OST_Canceled,
                 )
         self.myagent.rtn_order(rorder)
 

@@ -634,11 +634,14 @@ class c_instrument(object):
 
     def calc_remained_volume(self):   #计算剩余的可开仓量
         locked_volume = 0
+        opened_volume = 0
         for position in self.position_detail.values():
-            locked_volume += position.get_locked_volume()
-            logging.info(u'计算策略锁定量: pos:%s,locked_volume=%s' % (position,position.get_locked_volume()))
+            plocked,popened = position.get_locked_volume() 
+            locked_volume += plocked
+            opened_volume += popened
+            logging.debug(u'计算策略锁定量: pos:%s,locked_volume=%s,opened_volume=%s' % (position,plocked,popened))
         remained_volume = self.max_volume - locked_volume if self.max_volume > locked_volume else 0
-        logging.info(u'A_CRV2:%s合约总锁定数=%s,合约最大允许数=%s,剩余可开仓数=%s' % (self.name,locked_volume,self.max_volume,remained_volume))
+        logging.info(u'A_CRV2:%s合约总锁定数=%s,合约最大允许数=%s,剩余可开仓数=%s,已开仓数=%s' % (self.name,locked_volume,self.max_volume,remained_volume,opened_volume))
         return remained_volume
 
     def calc_margin_amount(self,price,direction):   
@@ -736,7 +739,7 @@ class Agent(AbsAgent):
                               #接口为(data), 从data的属性中取数据,并计算另外一些属性
         ###交易
         self.lastupdate = 0
-        self.transmitting_orders = {}    #orderref==>order,发出后等待回报的指令, 回报后到holding
+        self.ref2order = {}    #orderref==>order
         #self.queued_orders = []     #因为保证金原因等待发出的指令(合约、策略族、基准价、基准时间(到秒))
         self.front_id = None
         self.session_id = None
@@ -1127,6 +1130,7 @@ class Agent(AbsAgent):
 
             先计算理论可开数，然后根据可用保证金调整. 并虚拟锁定保证金
         '''
+        logging.info(u'计算并虚拟锁定实际开仓数')
         want_volume = order.position.calc_open_volume()
         inst_remained = order.instrument.calc_remained_volume()
         if want_volume > inst_remained:
@@ -1170,7 +1174,7 @@ class Agent(AbsAgent):
                     continue
                 ##有效Order
                 command.volume = order.volume
-                self.transmitting_orders[command.order_ref] = order
+                self.ref2order[command.order_ref] = order
                 ##初始化止损类
                 order.stoper = order.position.strategy.closer(order.instrument.data,order.base_price)
                 order.position.add_order(order)
@@ -1180,7 +1184,7 @@ class Agent(AbsAgent):
                 self.open_position(command)
             else:#平仓, Y跳后不论是否成功均撤单, 撤单应该比开仓更快，避免追不上
                 #print u'平仓'
-                self.transmitting_orders[command.order_ref] = order.source_order
+                self.ref2order[command.order_ref] = order.source_order
                 self.put_command(self.get_tick()+position.stoper.valid_length,fcustom(self.cancel_command,command=command))
                 self.close_position(command)
 
@@ -1247,7 +1251,6 @@ class Agent(AbsAgent):
         req = ustruct.InputOrderAction(
                 InstrumentID = command.instrument,
                 OrderRef = str(command.order_ref),
-                
                 BrokerID = self.cuser.broker_id,
                 InvestorID = self.cuser.investor_id,
                 FrontID = self.front_id,
@@ -1256,7 +1259,6 @@ class Agent(AbsAgent):
                 #OrderActionRef = self.inc_order_ref()  #没用,不关心这个，每次撤单成功都需要去查资金
             )
         r = self.trader.ReqOrderAction(req,self.inc_request_id())
-
 
     def finalize(self):
         pass
@@ -1307,11 +1309,11 @@ class Agent(AbsAgent):
                    在OnTrade中进行position的细致处理 
             #TODO: 必须处理策略分类持仓汇总和持仓总数不匹配时的问题
         '''
-        logging.info(u'A_RT1:成交回报,%s:orderref=%s,orders=%s' % (self.instruments,strade.OrderRef,self.transmitting_orders))
-        if int(strade.OrderRef) not in self.transmitting_orders or strade.InstrumentID not in self.instruments:
+        logging.info(u'A_RT1:成交回报,%s:orderref=%s,orders=%s' % (self.instruments,strade.OrderRef,self.ref2order))
+        if int(strade.OrderRef) not in self.ref2order or strade.InstrumentID not in self.instruments:
             logging.warning(u'A_RT2:收到非本程序发出的成交回报:%s-%s' % (strade.InstrumentID,strade.OrderRef))
         cur_inst = self.instruments[strade.InstrumentID]
-        myorder = self.transmitting_orders[int(strade.OrderRef)]
+        myorder = self.ref2order[int(strade.OrderRef)]
         if myorder.action_type == XOPEN:#开仓, 也可用pTrade.OffsetFlag判断
             is_completed = myorder.on_trade(price=int(strade.Price*10+0.1),volume=strade.Volume,trade_time=strade.TradeTime)
         else:
@@ -1333,6 +1335,9 @@ class Agent(AbsAgent):
         if sorder.OrderStatus == utype.THOST_FTDC_OST_Canceled or sorder.OrderStatus == utype.THOST_FTDC_OST_PartTradedNotQueueing:   #完整撤单或部成部撤
             ##查询可用资金
             self.put_command(self.get_tick()+1,self.fetch_trading_account)
+            ##处理相关Order
+            myorder = self.ref2order[int(sorder.OrderRef)]
+            myorder.on_cancel()
 
     def err_order_insert(self,order_ref,instrument_id,error_id,error_msg):
         '''
