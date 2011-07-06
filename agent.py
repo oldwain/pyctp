@@ -968,7 +968,9 @@ class Agent(AbsAgent):
         '''
         rev = False #默认不切换
         ddata = dinst.data
-        if (ctick.iorder == ddata.cur_min.viorder + 1 and (ctick.sec > 0 or ctick.msec>0)) or ctick.iorder > ddata.cur_min.viorder + 1 or ctick.date > ddata.cur_min.vdate:#时间切换. 00秒00毫秒属于上一分钟, 但如果下一单是隔了n分钟的，也直接切换
+        print 'ctick.iorder=%s' % (ctick.iorder,)
+        if (ctick.iorder == ddata.cur_min.viorder + 1 and (ctick.sec > 0 or ctick.msec>0)) or ctick.iorder > ddata.cur_min.viorder + 1 or ctick.date > ddata.cur_min.vdate:
+        #时间切换. 00秒00毫秒属于上一分钟, 但如果下一单是隔了n分钟的，也直接切换
             rev = True
             #print ctick.min1,ddata.cur_min.vtime,ctick.date,ddata.cur_min.vdate
             if (len(ddata.stime)>0 and (ctick.date > ddata.sdate[-1] or ctick.min1 > ddata.stime[-1])) or len(ddata.stime)==0:#已有分钟与已保存的有差别
@@ -1435,7 +1437,12 @@ class SaveAgent(Agent):
         inst = ctick.instrument
         if inst not in self.instruments:
             logger.info(u'接收到未订阅的合约数据:%s' % (inst,))
+            return False
         dinst = self.instruments[inst]#.data
+        ctick.iorder = dinst.get_order(ctick.min1)
+        if (ctick.iorder < dinst.data.cur_min.viorder and ctick.date == dinst.data.cur_min.vdate) or ctick.date < dinst.data.cur_min.vdate:
+            #print ctick.date,ctick.time,dinst.data.cur_min.vdate,dinst.data.cur_min.vtime
+            return False
         self.prepare_base(dinst,ctick)  
     
     def rsp_qry_instrument(self,pinstrument):
