@@ -728,7 +728,8 @@ class Agent(AbsAgent):
         ##
         self.trader = trader
         #self.trader.myagent = self
-        trader.initialize(self)
+        if trader != None:
+            trader.initialize(self)
         self.cuser = cuser
         self.strategy = my_strategy
         self.instruments = c_instrument.create_instruments(instruments,my_strategy)
@@ -1468,6 +1469,7 @@ def save_raw(base_name='base.ini',strategy_name='strategy.ini',base='Base',strat
 
     '''
     logging.basicConfig(filename="ctp_user_agent.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
+
  
     base_cfg = config.parse_base(base_name,base)
     strategy_cfg = config.parse_strategy(strategy_name,strategy)
