@@ -152,6 +152,9 @@ from TraderApi import TraderApi, TraderSpi
 import config
 import strategy
 
+#日内最后交易时间，超过为越界
+LAST_TRADE_TIME = 1515
+
 #数据定义中唯一一个enum
 THOST_TERT_RESTART  = 0
 THOST_TERT_RESUME   = 1
@@ -1436,9 +1439,13 @@ class SaveAgent(Agent):
     def RtnTick(self,ctick):#行情处理主循环
         inst = ctick.instrument
         if inst not in self.instruments:
-            logger.info(u'接收到未订阅的合约数据:%s' % (inst,))
+            logging.info(u'接收到未订阅的合约数据:%s' % (inst,))
+            return False
+        if ctick.min1 > LAST_TRADE_TIME:
+            logging.info(u'接收到不在时间范围的合约数据:%s:%s' % (inst,ctick.min1))
             return False
         dinst = self.instruments[inst]#.data
+        print inst,ctick.min1
         ctick.iorder = dinst.get_order(ctick.min1)
         if (ctick.iorder < dinst.data.cur_min.viorder and ctick.date == dinst.data.cur_min.vdate) or ctick.date < dinst.data.cur_min.vdate:
             #print ctick.date,ctick.time,dinst.data.cur_min.vdate,dinst.data.cur_min.vtime
