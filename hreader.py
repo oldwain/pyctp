@@ -362,10 +362,12 @@ class XPREPARER(object):
         self.fpreparer = fpreparer
 
     def pd(self,xtimes):#切日
-        poss = filter(lambda x:x[0]>x[1],zip(xtimes,xtimes[1:]+[0],range(len(xtimes))))
-        cposs = [z for (x,y,z) in poss]   #close
-        oposs = [c+1 if c-1>0 else 0 for c in cposs] #close
-        return zip(oposs,cposs[1:])
+        #poss = filter(lambda x:x[0]>x[1],zip(xtimes,xtimes[1:]+[0],range(len(xtimes))))
+        #cposs = [z for (x,y,z) in poss]   #close
+        poss = filter(lambda x:self.fpreparer.ISEND_DAY(x[0]),zip(xtimes,range(len(xtimes))))
+        cposs = [y for (x,y) in poss]   #close
+        oposs = [0] + [c+1 if c-1>0 else 0 for c in cposs] #close,第一个算日的开始
+        return zip(oposs,cposs)
     
     def p3(self,xtimes):#切3分钟,返回3分钟(3分开盘index,3分收盘index)
         poss = filter(lambda x:self.fpreparer.ISEND_3(x[0]),zip(xtimes,range(len(xtimes))))
@@ -434,6 +436,7 @@ def time_period_switch(data):
     '''
         判断分钟数据是否是3/5/15/30的卡点, 并计算相关数据
     '''
+    #print 'in time_period_switch'
     #if(len(data.sdate) == 0):   #该合约史上第一分钟,不引起切换. 这个在外部保障
     #    return
     assert len(data.sdate)>0
@@ -462,7 +465,7 @@ def time_period_switch(data):
     if fpreparer.ISEND_DAY(data.siorder[-1]) and (len(data.d1[IDATE])==0 
                                         or data.sdate[-1] > data.d1[IDATE][-1] 
                                     ):#添加新的日数据
-        append1(data.m15,data,270)
+        append1(data.d1,data,270)
  
 def append1(xdata,data1,length):
     '''

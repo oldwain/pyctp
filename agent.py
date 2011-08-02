@@ -827,10 +827,13 @@ class Agent(AbsAgent):
         '''
             准备数据环境, 如需要的30分钟数据
         '''
+        #print 'in prepare_data_env'
         hdatas = hreader.prepare_data([name for name in self.instruments],self.scur_day)
         for hdata in hdatas.values():
+            print 'PDE_B:',hdata.name
             self.instruments[hdata.name].data = hdata
             for dfo in self.data_funcs:
+                print 'PDE_C:',hdata.name,dfo.sfunc
                 dfo.sfunc(hdata)
             
     def register_data_funcs(self,*funcss):
@@ -944,6 +947,8 @@ class Agent(AbsAgent):
             logging.info(u'A_DF:cur_time=%s,last_min=%s' %(last_current_time,last_min))
             if last_current_time < last_min:    #如果已经有当分钟的记录，就不再需要保存了。
                 self.save_min(dinst)  
+                for func in self.data_funcs:    #动态计算
+                    func.func1(dinst.data)
             #print 'in day_finalize'
             if self.save_flag == True:
                 hreader.check_merge(ddata.name,self.scur_day)
@@ -961,7 +966,7 @@ class Agent(AbsAgent):
         ddata.siorder.append(dinst.get_order(ddata.cur_min.vtime))
         #print 'in save_min'
         ##需要save下
-        if self.save_flag == True:
+        if self.save_flag == True and ddata.cur_min.vdate == self.scur_day:   #只保存当日的
             hreader.save1(dinst.name,ddata.cur_min,self.scur_day)
 
     def prepare_base(self,dinst,ctick):
@@ -971,7 +976,7 @@ class Agent(AbsAgent):
         '''
         rev = False #默认不切换
         ddata = dinst.data
-        print 'ctick.iorder=%s' % (ctick.iorder,)
+        #print 'ctick.iorder=%s' % (ctick.iorder,)
         if (ctick.iorder == ddata.cur_min.viorder + 1 and (ctick.sec > 0 or ctick.msec>0)) or ctick.iorder > ddata.cur_min.viorder + 1 or ctick.date > ddata.cur_min.vdate:
         #时间切换. 00秒00毫秒属于上一分钟, 但如果下一单是隔了n分钟的，也直接切换
             rev = True
@@ -1041,6 +1046,7 @@ class Agent(AbsAgent):
         ddata.cur_day.vlowd = ctick.low
         ddata.cur_day.vclose = ctick.price
         #if (hreader.is_if(ctick.instrument) and ctick.min1 == 1514 and ctick.sec==59) or (not hreader.is_if(ctick.instrument) and ctick.min1 == 1459 and ctick.sec==59): #收盘作业
+        #print ddata.cur_min.viorder,ctick.sec,ctick.min1,ddata.cur_min.vtime
         if ddata.cur_min.viorder == 270 and ctick.sec == 59 and ctick.min1 >=ddata.cur_min.vtime: #避免收到历史行情引发问题
             #print 'in closing',ddata.cur_min.viorder,ctick.sec,ddata.cur_min.vtime,ctick.min1
             threading.Timer(1,self.day_finalize,args=[dinst,ctick.min1,ctick.sec]).start()

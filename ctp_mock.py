@@ -188,12 +188,46 @@ def run_ticks(ticks,myagent):
 def log_config():
     config_logging('ctp_trade_mock.log',console_level=logging.INFO)
 
-def trade_mock(instrument='IF1104'):
+'''
+import ctp_mock
+import hreader
+
+tday = 20110726
+instrument = 'IF1108'
+myagent = ctp_mock.create_agent_with_mocktrader(instrument,-1)    #不需要tday的当日数据
+myagent.scur_day = tday
+myagent.save_flag = True
+myagent.prepare_data_env()
+#myagent.instruments['IF1108'].data.atrd1
+ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
+ctp_mock.run_ticks(ticks,myagent)
+
+len(myagent.instruments['IF1108'].data.sclose)
+len(myagent.instruments['IF1108'].data.tr1)
+
+time.sleep(2)
+
+tday = 20110727
+myagent.scur_day = tday
+ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
+ctp_mock.run_ticks(ticks,myagent)
+
+time.sleep(2)
+
+tday = 20110728
+myagent.scur_day = tday
+ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
+ctp_mock.run_ticks(ticks,myagent)
+
+'''
+
+def trade_mock(instrument='IF1108'):
     #logging.basicConfig(filename="ctp_trade_mock.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
 
-    tday = 20110329
+    tday = 20110726
     myagent = create_agent_with_mocktrader(instrument,-1)    #不需要tday的当日数据
     myagent.scur_day = tday
+    myagent.save_flag = True
     ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
     #for tick in ticks:myagent.inc_tick(),myagent.RtnTick(tick)
     #for tick in ticks:
