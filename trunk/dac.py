@@ -208,7 +208,7 @@ def ATR1(data):
         动态计算最新ATR
     '''
     if len(data.m1[ICLOSE]) > len(data.tr1):    #1分钟数据
-        print len(data.m1[ICLOSE]),len(data.tr1)
+        #print len(data.m1[ICLOSE]),len(data.tr1)
         data.tr1.append(0)
         tr1(data.m1[ICLOSE],data.m1[IHIGH],data.m1[ILOW],data.tr1)
         data.atr1.append(0)

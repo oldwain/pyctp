@@ -830,10 +830,10 @@ class Agent(AbsAgent):
         #print 'in prepare_data_env'
         hdatas = hreader.prepare_data([name for name in self.instruments],self.scur_day)
         for hdata in hdatas.values():
-            print 'PDE_B:',hdata.name
+            #print 'PDE_B:',hdata.name
             self.instruments[hdata.name].data = hdata
             for dfo in self.data_funcs:
-                print 'PDE_C:',hdata.name,dfo.sfunc
+                #print 'PDE_C:',hdata.name,dfo.sfunc
                 dfo.sfunc(hdata)
             
     def register_data_funcs(self,*funcss):
