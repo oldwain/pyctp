@@ -192,12 +192,14 @@ def log_config():
 import ctp_mock
 import hreader
 
+preday = 20110725
 tday = 20110726
 instrument = 'IF1108'
 myagent = ctp_mock.create_agent_with_mocktrader(instrument,-1)    #不需要tday的当日数据
-myagent.scur_day = tday
+myagent.scur_day = preday
 myagent.save_flag = True
 myagent.prepare_data_env()
+myagent.scur_day = tday
 #myagent.instruments['IF1108'].data.atrd1
 ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
 ctp_mock.run_ticks(ticks,myagent)
