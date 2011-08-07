@@ -157,7 +157,7 @@ CFs = CF109,CF107
         config.strategy[sti] = cs
     return config
 
-def parse_state(strategy_cfg,name='state.ini',root='State'):
+def parse_state(strategy_cfg,instruments,name='state.ini',root='State'):
     '''现场恢复
     ;
     [State]
@@ -210,6 +210,7 @@ def parse_state(strategy_cfg,name='state.ini',root='State'):
         chd.opened_volume = int(cfg.get(shd,'opened_volume'))
         chd.orders = []
         oos = cfg.get(shd,'opened_orders').split(',')
+        cur_inst = instruments[chd.instrument]
         for oo in oos:
             soo = oo.strip()
             if soo == '':
@@ -219,15 +220,20 @@ def parse_state(strategy_cfg,name='state.ini',root='State'):
             order.strategy_name = cfg.get(soo,'strategy_name')
             #order.opener = strategy_cfg.smodule.__dict__[cfg.get(soo,'opener').strip()] #仅用于判断strategy
             #order.stoper_class = strategy_cfg.smodule.__dict__[cfg.get(soo,'stoper').strip()]
-            order.stoper = strategy_cfg.smodule.__dict__[cfg.get(soo,'stoper').strip()]()
+            order.stoper = strategy_cfg.smodule.__dict__[cfg.get(soo,'stoper').strip()](cur_inst.data,0) #满足签名
             order.stoper.load_parameters(cfg.get(soo,'stoper_parameters').strip())
+            state.mys = cfg.get(soo,'stoper_parameters').strip()   #调试用
+            #print cfg.get(soo,'stoper_parameters').strip()
             order.base_price = int(cfg.get(soo,'base_price').strip())
-            order.stoper.set_cur_stop(int(cfg.get(soo,'current_stop_price').strip()))
+            order.mytime = int(cfg.get(soo,'mytime').strip()) 
+            order.action_type = int(cfg.get(soo,'action_type').strip()) 
+            #order.stoper.set_cur_stop(int(cfg.get(soo,'current_stop_price').strip()))
             if cfg.has_option(soo,'target_price'):
                 order.target_price = int(cfg.get(soo,'target_price'))
             else:
                 order.target_price = 0
             chd.orders.append(order)
+            #print chd.instrument
     return state
 
 def save_state(state,name='state.ini',root='State'):
@@ -282,7 +288,9 @@ def save_state(state,name='state.ini',root='State'):
             cfg.add_section(mystr)
             cfg.set(mystr,'volume',order.volume)
             cfg.set(mystr,'base_price',order.base_price)
-            cfg.set(mystr,'current_stop_price',order.stoper.get_cur_stop())
+            cfg.set(mystr,'mytime',order.mytime)            
+            cfg.set(mystr,'action_type',order.action_type)            
+            #cfg.set(mystr,'current_stop_price',order.stoper.get_cur_stop())
             cfg.set(mystr,'strategy_name',order.get_strategy_name())
             #cfg.set(mystr,'opener',base.type_name(order.get_opener()))
             #cfg.set(mystr,'opener_parameters',order.get_opener().save_parameters())
@@ -291,7 +299,7 @@ def save_state(state,name='state.ini',root='State'):
             if order.target_price>0:
                 cfg.set(mystr,'target_price',order.target_price)
         cfg.set(key,'opened_orders',','.join(ostr))
-    fo = open(CONFIG_PATH + name,'w+')
+    fo = open(CONFIG_PATH + name,u'w+')
     cfg.write(fo)
     fo.close()
     return 

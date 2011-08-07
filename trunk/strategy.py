@@ -32,8 +32,8 @@ from base import *
 class Order(object):
     def __init__(self,position,base_price,target_price,mytime,action_type):
         self.position = position
-        self.base_price = base_price
-        self.target_price = target_price
+        self.base_price = base_price        #开仓基准价
+        self.target_price = target_price    #开仓加价部分
         self.mytime = mytime
         ##衍生
         self.instrument = position.instrument
@@ -45,7 +45,7 @@ class Order(object):
         self.volume = 0 #目标成交手数,锁定总数
         self.opened_volume = 0  #实际成交手数
         self.stoper = None
-        self.trader_detail = []
+        self.trade_detail = []
         self.cancelled = False  #是否已经撤单
 
     def on_trade(self,price,volume,trade_time):
@@ -56,7 +56,7 @@ class Order(object):
         if self.volume < self.opened_volume:    #因为cancel和成交的时间差导致的
             self.volume = self.opened_volume
         logging.info(u'price=%s,volume=%s,self.opened_volume=%s,is_closed=%s' % (price,volume,self.opened_volume,self.is_closed()))
-        self.trader_detail.append((price,volume,trade_time))
+        self.trade_detail.append((price,volume,trade_time))
         self.position.re_calc()
         return self.opened_volume == self.volume
         
@@ -162,14 +162,14 @@ class Resumable(object):#可中间恢复
         for key,value in self.__dict__.items():
             #print key,value,type(value)
             if type(value) == unicode:
-                parameters.append("'%s':u'%s'" % (key,value))
+                parameters.append(u"'%s':'%s'" % (key,value))   #这里不要多此一举，写成u"'%s':u'%s'",因为本来就是u的，如果再来一遍，就变成多搞了边encode('utf-8'),后面全乱
             elif type(value) == str:
-                parameters.append("'%s':'%s'" % (key,value))
+                parameters.append(u"'%s':'%s'" % (key,value))
             elif type(value) == int:
-                parameters.append("'%s':%d" % (key,value))
+                parameters.append(u"'%s':%d" % (key,value))
             elif type(value) == float:
-                parameters.append("'%s':%s" % (key,value))
-        return '{%s}' % (','.join(parameters),)
+                parameters.append(u"'%s':%s" % (key,value))
+        return u'{%s}' % (','.join(parameters),)
 
     def load_parameters(self,parameters):  #重新装载参数
         self.__dict__.update(eval(parameters))
@@ -232,11 +232,11 @@ class SHORT_ENTRY(ENTRY):    #空头回归策略
 #####具体策略
 class day_long_break(LONG_BREAK):
     def check(self,data,ctick):
-        return (0,0)
+        return (False,0)
 
 class day_short_break(SHORT_BREAK):
     def check(self,data,ctick):
-        return (0,0)
+        return (False,0)
 
 
 ##止损类(平仓不允许钓鱼，必然直接平仓)
@@ -244,8 +244,8 @@ class day_short_break(SHORT_BREAK):
     每个具体止损类必须实现三个方法
         __init__方法签名必须是(self,data,**kwargs),或者其它参数被fcustom化
         check方法签名为(self,ctick)
-            必须返回(平仓标志, 基准价)
-            其中平仓标志:    0:不平仓, 1:平仓
+            必须返回(平仓标志, 基准价,止损变化标志)
+            其中平仓标志:    False:不平仓, True:平仓
                          基准价为平仓基准价，将用于计算平仓限价
         calc_target_price(self,base_price,tick_base) #计算平仓限价, 其中tick_base是每跳幅度
 '''
@@ -256,9 +256,10 @@ class STOPER(Resumable):    #离场类标记
     '''
         对于必须要实现断点恢复的stoper类，必须使用self.base_line和self.cur_stop作为判断标准
     '''
-    def __init__(self):
+    def __init__(self,data,bline):
         self.cur_stop = 0
-        self.base_line = 0
+        self.data = data
+        self.set_base_line(bline)
 
     def get_cur_stop(self):
         return self.cur_stop
@@ -273,7 +274,8 @@ class STOPER(Resumable):    #离场类标记
         self.base_line = base_line
 
 class LONG_STOPER(STOPER):
-    def __init__(self,max_overflow=120,valid_length=STOP_VALID_LENGTH):
+    def __init__(self,data,bline,max_overflow=120,valid_length=STOP_VALID_LENGTH):
+        STOPER.__init__(self,data,bline)
         self.direction = SHORT
         self.max_overflow = max_overflow    #溢点用于计算目标价
         self.valid_length = valid_length    #有效期用于计算撤单时间
@@ -284,7 +286,8 @@ class LONG_STOPER(STOPER):
 
 
 class SHORT_STOPER(STOPER):
-    def __init__(self,max_overflow=120,valid_length=STOP_VALID_LENGTH):
+    def __init__(self,data,bline,max_overflow=120,valid_length=STOP_VALID_LENGTH):
+        STOPER.__init__(self,data,bline)
         self.direction = LONG
         self.max_overflow = max_overflow    #溢点用于计算目标价
         self.valid_length = valid_length    #有效期用于计算撤单时间
@@ -299,8 +302,7 @@ class DATR_LONG_STOPER(LONG_STOPER):#日ATR多头止损
         '''data:行情对象
            bline: 价格基线
         '''
-        self.data = data
-        self.set_base_line(bline)
+        LONG_STOPER.__init__(self,data,bline)
         self.thigh = bline
         self.ticks = 0
         self.name = u'多头日ATR止损,初始止损=%s,保本=%s,最大回撤=%s' % (rbase,rkeeper,rdrawdown)
@@ -315,7 +317,7 @@ class DATR_LONG_STOPER(LONG_STOPER):#日ATR多头止损
         '''
         stop_changed = False
         if tick.price < self.get_cur_stop():
-            return (1,tick.price,stop_changed)
+            return (True,tick.price,stop_changed)
         if self.get_cur_stop()< self.get_base_line() and tick.price > self.get_base_line() + self.keeper:
             ##提升保本
             self.set_cur_stop(self.get_base_line())
@@ -324,12 +326,12 @@ class DATR_LONG_STOPER(LONG_STOPER):#日ATR多头止损
             self.thigh = tick.price
             if self.thigh - self.max_drawdown > self.get_cur_stop():
                 self.set_cur_stop(self.thigh - self.max_drawdown)
-        return (0,0,0)
+                stop_changed = True
+        return (False,self.get_base_line(),stop_changed)
 
 class DATR_SHORT_STOPER(SHORT_STOPER):#日ATR空头止损
     def __init__(self,data,bline,rbase=0.12,rkeeper=0.2,rdrawdown = 0.4):
-        self.data = data
-        self.set_base_line(bline)
+        SHORT_STOPER.__init__(self,data,bline)
         self.tlow = bline
         self.itime = len(self.data.sclose)  #time的索引，用于计算耗时
         self.name = u'空头日ATR止损,初始止损=%s,保本=%s,最大回撤=%s' % (rbase,rkeeper,rdrawdown)
@@ -342,16 +344,19 @@ class DATR_SHORT_STOPER(SHORT_STOPER):#日ATR空头止损
             必须返回(平仓标志, 基准价,stop变化标志)
             基准价为0则为当前价
         '''
+        stop_changed = False
         if tick.price > self.get_cur_stop():
-            return (1,tick.price)
+            return (True,tick.price,stop_changed)
         if self.get_cur_stop()> self.get_base_line() and tick.price < self.get_base_line() - self.keeper:
             ##提升保本
             self.set_cur_stop(self.get_base_line())
+            stop_changed = True
         if tick.price < self.tlow:
             self.tlow = tick.price
             if self.tlow - self.max_drawdown > self.get_cur_stop():
                 self.set_cur_stop(self.tlow - self.max_drawdown)
-        return (0,0,0)       
+                stop_changed = True
+        return (False,self.get_base_line(),stop_changed)
 
 
 datr_long_stoper_12 = fcustom(DATR_LONG_STOPER,rbase=0.12)
