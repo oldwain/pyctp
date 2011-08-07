@@ -721,7 +721,7 @@ class AbsAgent(object):
 class Agent(AbsAgent):
     logger = logging.getLogger('ctp.agent')
 
-    def __init__(self,trader,cuser,instruments,my_strategy,tday=0):
+    def __init__(self,trader,cuser,instruments,strategy_cfg,tday=0):
         '''
             trader为交易对象
             tday为当前日,为0则为当日
@@ -734,8 +734,9 @@ class Agent(AbsAgent):
         if trader != None:
             trader.initialize(self)
         self.cuser = cuser
-        self.strategy = my_strategy
-        self.instruments = c_instrument.create_instruments(instruments,my_strategy)
+        self.strategy_cfg = strategy_cfg
+        self.strategy = strategy_cfg.strategy
+        self.instruments = c_instrument.create_instruments(instruments,self.strategy)
         self.request_id = 1
         self.initialized = False
         self.data_funcs = []  #计算函数集合. 如计算各类指标, 顺序关系非常重要
@@ -1076,7 +1077,7 @@ class Agent(AbsAgent):
                                 volume=order.opened_volume,
                                 direction = order.stoper.direction,
                                 base_price = mysignal[1],
-                                price=order.stoper.calc_target_price(mysignal[1],cur_inst.tick_base),
+                                target_price=order.stoper.calc_target_price(mysignal[1],cur_inst.tick_base),
                                 source_order = order, #原始头寸
                                 mytime = ctick.time,
                                 action_type = XCLOSE,
@@ -1120,7 +1121,8 @@ class Agent(AbsAgent):
                             )
                 ##这里不处理保证金，直接使用理论开仓数。后面在实际开仓时才处理
                 #candidate.volume,margin_amount = self.calc_open_volume(cur_inst,candidate)
-                candidate.volume = self.calc_open_volume_pre(cur_inst,candidate)
+                #candidate.volume = self.calc_open_volume_pre(cur_inst,candidate)
+                candidate.volume = 0    #开仓时在此处不需要处理开仓量
                 #print 'candidate volume:',candidate.volume
                 #if candidate.volume > 0:
                 #    self.available -= (candidate.volume *margin_amount)  #锁定保证金
@@ -1196,8 +1198,9 @@ class Agent(AbsAgent):
                 self.open_position(command)
             else:#平仓, Y跳后不论是否成功均撤单, 撤单应该比开仓更快，避免追不上
                 #print u'平仓'
-                self.ref2order[command.order_ref] = order.source_order
-                self.put_command(self.get_tick()+position.stoper.valid_length,fcustom(self.cancel_command,command=command))
+                #self.ref2order[command.order_ref] = order.source_order
+                self.ref2order[command.order_ref] = order   #2011-8-6
+                self.put_command(self.get_tick()+order.source_order.stoper.valid_length,fcustom(self.cancel_command,command=command))
                 self.close_position(command)
 
     def open_position(self,order):
@@ -1300,13 +1303,19 @@ class Agent(AbsAgent):
                 2. 获得当日分钟数据, 并计算相关指标
                 3. 获得当日持仓，并初始化止损. 
         '''
-        state = config.parse_state(self.strategy)
+        state = config.parse_state(self.strategy_cfg,self.instruments)
         cposs = set([])
-        for chd in state.holdings:
+        for chd in state.holdings.values():
             cur_inst = self.instruments[chd.instrument]
             for order in chd.orders:
+                order.stoper.data = cur_inst.data   #填充data, 另bline已经搞定
                 cur_position = cur_inst.position_detail[order.strategy_name]
-                cur_position.add_order(order)
+                xorder = strategy.Order(cur_position,order.base_price,order.target_price,order.mytime,order.action_type)
+                xorder.volume = xorder.opened_volume = order.volume
+                xorder.stoper = order.stoper
+                xorder.cancelled = True #需要手工撤掉未成交的单子
+                #cur_position.add_order(order)
+                cur_position.add_order(xorder)
                 cposs.add(cur_position)
         for pos in cposs:
             pos.re_calc()
@@ -1328,8 +1337,10 @@ class Agent(AbsAgent):
         myorder = self.ref2order[int(strade.OrderRef)]
         if myorder.action_type == XOPEN:#开仓, 也可用pTrade.OffsetFlag判断
             is_completed = myorder.on_trade(price=int(strade.Price*10+0.1),volume=strade.Volume,trade_time=strade.TradeTime)
+            logging.info(u'A_RT31,开仓回报');
         else:
             myorder.source_order.on_close(price=int(strade.Price*10+0.1),volume=strade.Volume,trade_time=strade.TradeTime)
+            logging.info(u'A_RT32,平仓回报');
         self.save_state()
         ##查询可用资金
         #print 'fetch_trading_account'
@@ -1349,7 +1360,8 @@ class Agent(AbsAgent):
             self.put_command(self.get_tick()+1,self.fetch_trading_account)
             ##处理相关Order
             myorder = self.ref2order[int(sorder.OrderRef)]
-            myorder.on_cancel()
+            if myorder.action_type == XOPEN:    #开仓指令cancel时需要处理，平仓指令cancel时不需要处理
+                myorder.on_cancel()
 
     def err_order_insert(self,order_ref,instrument_id,error_id,error_msg):
         '''

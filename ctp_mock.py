@@ -53,7 +53,7 @@ class TraderMock(object):
             self.available -= order.LimitPrice * 300 * 0.17
         else:
             self.available += order.LimitPrice * 300 * 0.17
-        #self.myagent.rtn_trade(trade)
+        self.myagent.rtn_trade(trade)
 
     def ReqOrderAction(self, corder, request_id):
         '''撤单请求'''
@@ -172,7 +172,7 @@ def create_agent_with_mocktrader(instrument,tday):
 
     ##这里没有考虑现场恢复，state中需注明当日
     cuser = BaseObject(broker_id='test',port=1111,investor_id='test',passwd='test')
-    myagent = agent.Agent(trader,cuser,[instrument],strategy_cfg.strategy,tday=tday) 
+    myagent = agent.Agent(trader,cuser,[instrument],strategy_cfg,tday=tday) 
 
     req = BaseObject(InstrumentID=instrument)
     trader.ReqQryInstrumentMarginRate(req)
@@ -192,12 +192,14 @@ def log_config():
 import ctp_mock
 import hreader
 
+ctp_mock.log_config()
+
 preday = 20110725
 tday = 20110726
 instrument = 'IF1108'
 myagent = ctp_mock.create_agent_with_mocktrader(instrument,-1)    #不需要tday的当日数据
 myagent.scur_day = preday
-myagent.save_flag = True
+#myagent.save_flag = True
 myagent.prepare_data_env()
 myagent.scur_day = tday
 #myagent.instruments['IF1108'].data.atrd1
@@ -207,6 +209,15 @@ ctp_mock.run_ticks(ticks,myagent)
 len(myagent.instruments['IF1108'].data.sclose)
 len(myagent.instruments['IF1108'].data.tr1)
 
+################
+#第一次的ticks只到10:02
+################
+#当日第二次接续
+
+
+################
+################
+#后续日期
 time.sleep(2)
 
 tday = 20110727
