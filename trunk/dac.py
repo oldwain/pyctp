@@ -190,9 +190,9 @@ def ATR(data):
     #data.tr3 = tr(data.m3[ICLOSE],data.m3[IHIGH],data.m3[ILOW])
     #data.atr3 = atr(data.tr3,20)
     #data.xatr3 = xatr(data.atr3,data.m3[ICLOSE])
-    data.tr5 = tr(data.m5[ICLOSE],data.m5[IHIGH],data.m5[ILOW])
-    data.atr5 = atr(data.tr5,20)
-    data.xatr5 = xatr(data.atr5,data.m5[ICLOSE])
+    #data.tr5 = tr(data.m5[ICLOSE],data.m5[IHIGH],data.m5[ILOW])
+    #data.atr5 = atr(data.tr5,20)
+    #data.xatr5 = xatr(data.atr5,data.m5[ICLOSE])
     #data.tr15 = tr(data.m15[ICLOSE],data.m15[IHIGH],data.m15[ILOW])
     #data.atr15 = atr(data.tr15,20)
     #data.xatr15 = xatr(data.atr15,data.m15[ICLOSE])
@@ -215,13 +215,13 @@ def ATR1(data):
         atr1(data.tr1,data.atr1,20)
         data.xatr1.append(0)
         xatr1(data.atr1,data.m1[ICLOSE],data.xatr1)
-    if len(data.m5[ICLOSE]) > len(data.tr5):    #5分钟数据
-        data.tr5.append(0)
-        tr1(data.m5[ICLOSE],data.m5[IHIGH],data.m5[ILOW],data.tr5)
-        data.atr5.append(0)
-        atr1(data.tr5,data.atr5,20)
-        data.xatr5.append(0)
-        xatr1(data.atr5,data.m5[ICLOSE],data.xatr5)
+    #if len(data.m5[ICLOSE]) > len(data.tr5):    #5分钟数据
+    #    data.tr5.append(0)
+    #    tr1(data.m5[ICLOSE],data.m5[IHIGH],data.m5[ILOW],data.tr5)
+    #    data.atr5.append(0)
+    #    atr1(data.tr5,data.atr5,20)
+    #    data.xatr5.append(0)
+    #    xatr1(data.atr5,data.m5[ICLOSE],data.xatr5)
     if len(data.m30[ICLOSE]) > len(data.tr30):    #30分钟数据
         data.tr30.append(0)
         tr1(data.m30[ICLOSE],data.m30[IHIGH],data.m30[ILOW],data.tr30)
@@ -241,24 +241,26 @@ def STREND(data):
     '''
         计算趋势
     '''
-    data.ma30_120 = ma(data.m30[ICLOSE],120)
-    data.t120 = strend2(data.ma30_120)
+    #data.ma30_120 = ma(data.m30[ICLOSE],120)
+    #data.t120 = strend2(data.ma30_120)
+    pass
 
 def STREND1(data):
     '''
         动态计算t120的最新值
     '''
-    if len(data.m30[ICLOSE]) > len(data.ma30_120):  #需要计算
-        data.ma30_120.append(0)
-        data.t120.append(0)
-        ma1(data.m30[ICLOSE],120,data.ma30_120)
-        strend2_1(data.ma30_120,data.t120)
+    #if len(data.m30[ICLOSE]) > len(data.ma30_120):  #需要计算
+    #    data.ma30_120.append(0)
+    #    data.t120.append(0)
+    #    ma1(data.m30[ICLOSE],120,data.ma30_120)
+    #    strend2_1(data.ma30_120,data.t120)
+    pass
 
 def MA(data):
     '''
         序列计算基本均线, 1分钟的5/7/10/13/20/30/60/120/135/270均线
     '''
-    data.ma_1 = ma(data.sclose,1)
+    #data.ma_1 = ma(data.sclose,1)
     
     data.ma_5 = ma(data.sclose,5)
     #data.ma_7 = ma(data.sclose,7)
@@ -266,38 +268,38 @@ def MA(data):
     data.ma_13 = ma(data.sclose,13)
     #data.ma_20 = ma(data.sclose,20)
     data.ma_30 = ma(data.sclose,30)
-    data.ma_60 = ma(data.sclose,60)
-    data.ma_120 = ma(data.sclose,120)
+    #data.ma_60 = ma(data.sclose,60)
+    #data.ma_120 = ma(data.sclose,120)
     #data.ma_135 = ma(data.sclose,135)
-    data.ma_270 = ma(data.sclose,270)
+    #data.ma_270 = ma(data.sclose,270)
  
 def MA1(data):
     '''
         动态计算基本均线, 1分钟的5/7/10/13/20/30/60/120/135/270均线
     '''
     #print u'before:收盘序列长度:%s,ma5序列长度:%s' % (len(data.sclose),len(data.ma_5))
-    data.ma_1.append(0)
+    #data.ma_1.append(0)
     data.ma_5.append(0)
     #data.ma_7.append(0)
     #data.ma_10.append(0)
     data.ma_13.append(0)
     #data.ma_20.append(0)
     data.ma_30.append(0)
-    data.ma_60.append(0)
-    data.ma_120.append(0)
+    #data.ma_60.append(0)
+    #data.ma_120.append(0)
     #data.ma_135.append(0)    
-    data.ma_270.append(0)    
-    ma1(data.sclose,1,data.ma_1)    
-    ma1(data.sclose,5,data.ma_5)
+    #data.ma_270.append(0)    
+    #ma1(data.sclose,1,data.ma_1)    
+    #ma1(data.sclose,5,data.ma_5)
     #ma1(data.sclose,7,data.ma_7)
     #ma1(data.sclose,10,data.ma_10)
     ma1(data.sclose,13,data.ma_13)
     #ma1(data.sclose,20,data.ma_20)
     ma1(data.sclose,30,data.ma_30)
-    ma1(data.sclose,60,data.ma_60)
-    ma1(data.sclose,120,data.ma_120)
+    #ma1(data.sclose,60,data.ma_60)
+    #ma1(data.sclose,120,data.ma_120)
     #ma1(data.sclose,135,data.ma_135)
-    ma1(data.sclose,270,data.ma_270)
+    #ma1(data.sclose,270,data.ma_270)
     #print u'after:收盘序列长度:%s,ma5序列长度:%s' % (len(data.sclose),len(data.ma_5))
     assert len(data.sclose) == len(data.ma_5),u'sclose序列和ma_5序列长度不同 len(data.sclose)=%s,len(data.ma5)=%s' % (len(data.sclose),len(data.ma_5))
 

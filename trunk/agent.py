@@ -924,6 +924,7 @@ class Agent(AbsAgent):
         ctick.iorder = dinst.get_order(ctick.min1)
         if (ctick.iorder < dinst.data.cur_min.viorder and ctick.date == dinst.data.cur_min.vdate) or ctick.date < dinst.data.cur_min.vdate:
             #print ctick.date,ctick.time,dinst.data.cur_min.vdate,dinst.data.cur_min.vtime
+            #logging.info(u'过滤:time=%s' % (ctick.time))
             return False
         if(self.prepare_base(dinst,ctick)):  #如果切分分钟则返回>0
             for func in self.data_funcs:    #动态计算
