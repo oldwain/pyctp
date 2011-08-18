@@ -22,3 +22,19 @@ class day_long_stoper_35(DATR_LONG_STOPER):#触发后5分钟平仓
             return (True,ctick.low,False)
         return (False,0,False)
 
+
+class dl_break_nhh(LONG_BREAK): #nhh的实现
+    def check(self,data,ctick):
+        pass
+
+class dl_break_nhhv(LONG_BREAK): #nhhv的实现
+    def check(self,data,ctick):
+        pass
+
+class dl_break_mll2(SHORT_BREAK): #mll2的实现
+    def check(self,data,ctick):
+        pass
+
+class dl_break_mll2v(SHORT_BREAK): #mll2v的实现
+    def check(self,data,ctick):
+        pass
