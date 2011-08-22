@@ -353,14 +353,78 @@ class DATR_SHORT_STOPER(SHORT_STOPER):#日ATR空头止损
             stop_changed = True
         if tick.price < self.tlow:
             self.tlow = tick.price
-            if self.tlow - self.max_drawdown > self.get_cur_stop():
-                self.set_cur_stop(self.tlow - self.max_drawdown)
+            if self.tlow + self.max_drawdown < self.get_cur_stop():
+                self.set_cur_stop(self.tlow + self.max_drawdown)
                 stop_changed = True
         return (False,self.get_base_line(),stop_changed)
 
 
 datr_long_stoper_12 = fcustom(DATR_LONG_STOPER,rbase=0.12)
 datr_short_stoper_12 = fcustom(DATR_SHORT_STOPER,rbase=0.12)
+
+class DATR_LONG_MOVING_STOPER(LONG_STOPER):
+    '''
+        简化的移动跟踪止损, 达到快速提升止损和和逐步放开盈利端的平衡
+    '''
+    def __init__(self,data,bline,lost_base=100,max_drawdown=360,tstep=40,vstep=20):
+        '''
+           data:行情对象
+           bline: 价格基线
+        '''
+        LONG_STOPER.__init__(self,data,bline)
+        self.lost_base = lost_base
+        self.ticks = 0
+        self.set_cur_stop(bline - lost_base)
+        self.stop0 = bline - lost_base
+        self.name = u'多头移动止损,初始止损=%s,步长=%s/%s,最大回撤=%s' % (self.stop0,vstep,tstep,max_drawdown)
+        self.thigh = bline
+
+    def check(self,tick):
+        '''
+            必须返回(平仓标志, 基准价,stop变化标志)
+            基准价为0则为当前价
+        '''
+        stop_changed = False
+        if tick.price < self.get_cur_stop():
+            return (True,tick.price,stop_changed)
+        if tick.price > self.thigh:
+            self.thigh = tick.price
+            nstop = self.stop0 + (tick.price - self.bline) / self.tstep * vstep
+            if nstop > self.get_cur_stop():
+                self.set_cur_stop(nstop)
+                stop_changed = True
+        return (False,self.get_base_line(),stop_changed)
+
+
+class DATR_SHORT_MOVING_STOPER(SHORT_STOPER):#日ATR空头止损
+    def __init__(self,data,bline,lost_base=100,max_drawdown=360,tstep=40,vstep=20):
+        '''
+           data:行情对象
+           bline: 价格基线
+        '''
+        LONG_STOPER.__init__(self,data,bline)
+        self.lost_base = lost_base
+        self.ticks = 0
+        self.set_cur_stop(bline + lost_base)
+        self.stop0 = bline + lost_base
+        self.name = u'空头移动止损,初始止损=%s,步长=%s/%s,最大回撤=%s' % (self.stop0,vstep,tstep,max_drawdown)
+        self.tlow = bline
+
+    def check(self,tick):
+        '''
+            必须返回(平仓标志, 基准价,stop变化标志)
+            基准价为0则为当前价
+        '''
+        stop_changed = False
+        if tick.price > self.get_cur_stop():
+            return (True,tick.price,stop_changed)
+        if tick.price < self.tlow:
+            self.tlow = tick.price
+            nstop = self.stop0 + (tick.price - self.bline) / self.tstep * vstep
+            if nstop < self.get_cur_stop():
+                self.set_cur_stop(nstop)
+                stop_changed = True
+        return (False,self.get_base_line(),stop_changed)
 
 
 class STRATEGY(object):#策略基类, 单纯包装
