@@ -439,6 +439,8 @@ def time_period_switch(data):
     #print 'in time_period_switch'
     #if(len(data.sdate) == 0):   #该合约史上第一分钟,不引起切换. 这个在外部保障
     #    return
+    #logging.info('TPS1:len(m1)=%s' % len(data.m1[0]))
+    #data.m1就是data.transaction
     assert len(data.sdate)>0
     #fpreparer = IF_XPREPARER if is_if(data.instrument) else CM_XPREPARER
     fpreparer = SPREPARER
@@ -466,7 +468,9 @@ def time_period_switch(data):
                                         or data.sdate[-1] > data.d1[IDATE][-1] 
                                     ):#添加新的日数据
         append1(data.d1,data,270)
+    #logging.info('TPS1:len(m1)=%s' % len(data.m1[0]))
  
+
 def append1(xdata,data1,length):
     '''
         将data1中最后length的数据组合以后放入xdata

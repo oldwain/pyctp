@@ -966,6 +966,7 @@ class Agent(AbsAgent):
         ddata.sholding.append(ddata.cur_min.vholding)
         ddata.svolume.append(ddata.cur_min.vvolume)
         ddata.siorder.append(dinst.get_order(ddata.cur_min.vtime))
+        #logging.info('SM1:len(m1)=%s' % len(ddata.m1[0])) ##ddata.m1就是ddata.transaction, 而ddata.sdata=ddata.m1[IDATE]
         #print 'in save_min'
         ##需要save下
         if self.save_flag == True and ddata.cur_min.vdate == self.scur_day:   #只保存当日的
@@ -981,6 +982,7 @@ class Agent(AbsAgent):
         #print 'ctick.iorder=%s' % (ctick.iorder,)
         if (ctick.iorder == ddata.cur_min.viorder + 1 and (ctick.sec > 0 or ctick.msec>0)) or ctick.iorder > ddata.cur_min.viorder + 1 or ctick.date > ddata.cur_min.vdate:
         #时间切换. 00秒00毫秒属于上一分钟, 但如果下一单是隔了n分钟的，也直接切换
+            #logging.info('PB2A:len(m1)=%s' % len(ddata.m1[0]))
             rev = True
             #print ctick.min1,ddata.cur_min.vtime,ctick.date,ddata.cur_min.vdate
             if (len(ddata.stime)>0 and (ctick.date > ddata.sdate[-1] or ctick.min1 > ddata.stime[-1])) or len(ddata.stime)==0:#已有分钟与已保存的有差别
@@ -1004,7 +1006,9 @@ class Agent(AbsAgent):
                 #    rev = False
                 if dinst.begin_flag:
                     #print u'保存分钟数据,date=%s,time=%s' % (ddata.cur_min.vdate,ddata.cur_min.vtime)
+                    #logging.info('PB2A1:len(m1)=%s' % len(ddata.m1[0]))
                     self.save_min(dinst)
+                    #logging.info('PB2A2:len(m1)=%s' % len(ddata.m1[0]))
                 else:
                     #print u'第-1分钟数据不保存,date=%s,time=%s' % (ddata.cur_min.vdate,ddata.cur_min.vtime)
                     dinst.begin_flag = True
@@ -1019,6 +1023,7 @@ class Agent(AbsAgent):
             ddata.cur_min.vvolume = ctick.dvolume - ddata.cur_day.vvolume if ctick.date == ddata.cur_day.vdate else ctick.dvolume
             ddata.cur_min.viorder = ctick.iorder
             #print 'in change:',ddata.cur_min.vvolume
+            #logging.info('PB2B:len(m1)=%s' % len(ddata.m1[0]))
         elif ctick.iorder == ddata.cur_min.viorder or (ctick.iorder == ddata.cur_min.viorder + 1 and ctick.sec == 0 and ctick.msec==0):#当分钟的处理. 在接续时，如果resume时间正好是当分钟，会发生当分钟重复计数
             #print ddata.cur_min.vvolume,ctick.dvolume,ddata.cur_day.vvolume,ctick.time,ctick.sec,ctick.msec
             ddata.cur_min.vclose = ctick.price
