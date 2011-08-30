@@ -78,13 +78,13 @@ def atr1(ltr,target,length=20):
     return target[-1]
  
 def xatr(latr,sclose):
-    return [ia * CBASE * CBASE / ic for ia,ic in zip(latr,sclose)]
+    return [ia * CBASE / ic for ia,ic in zip(latr,sclose)]
 
 def xatr1(latr,sclose,lxatr):
     if len(latr)<1:
         return 0
     assert len(latr) == len(sclose) == len(lxatr),u'源序列与目标序列长度不相等,%s:%s' % (len(latr),len(target))
-    lxatr[-1] = latr[-1] * CBASE * CBASE / sclose[-1]
+    lxatr[-1] = latr[-1] * CBASE / sclose[-1]
     return lxatr[-1]
 
 def accumulate(source):

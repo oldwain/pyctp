@@ -204,7 +204,7 @@ myagent.prepare_data_env()
 myagent.scur_day = tday
 #myagent.instruments['IF1109'].data.atrd1
 ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
-ctp_mock.run_ticks(ticks[:10000],myagent)
+ctp_mock.run_ticks(ticks[:12000],myagent)
 
 len(myagent.instruments['IF1109'].data.sclose)
 len(myagent.instruments['IF1109'].data.tr1)

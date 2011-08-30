@@ -80,14 +80,15 @@ class dl_break_mll2(SHORT_BREAK): #mll2的实现
                 and self.cur_tlow < ldmid - 60 
                 and data.ma_13[-1] < data.ma_30[-1] 
                 and vhigh - self.cur_tlow < opend / 33 
-                and data.xatr[-1] < 2000
-                and data.xatr30[-1] < 10000
+                #and data.xatr1[-1] < 2000
+                #and data.xatr30[-1] < 10000
                 and ctick.min1 > 944 
                 and ctick.min1 < 1445
             )
         my_signal = signal and fsignal
         if my_signal and ctick.time != self.last_signal and ctick.time<1300:
             logging.info(u'发出信号:%s:%s:%s:%s,self.cur_tlow=%s' % ('dl_break_mll2',ctick.time,ctick.sec,ctick.price,self.cur_tlow))
+            logging.info(u'ATR1=%s,ATR30=%s,XATR1=%s,XATR30=%s' % (data.atr1[-1],data.atr30[-1],data.xatr1[-1],data.xatr30[-1]))
             self.last_signal = ctick.time
             return (True,0)
         return (False,0)
@@ -136,7 +137,7 @@ class dl_break_mll2v(SHORT_BREAK): #mll2v的实现
                 and self.cur_tlow < ldmid - self.vmid
                 and data.ma_13[-1] < data.ma_30[-1] 
                 and vhigh - self.cur_tlow < opend / 33 
-                and data.xatr[-1] < 2000
+                and data.xatr1[-1] < 2000
                 and data.xatr30[-1] < 10000
                 and ctick.min1 > 1000 
                 and ctick.min1 < 1445
