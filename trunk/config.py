@@ -141,6 +141,7 @@ CFs = CF109,CF107
             sscs = scs.strip()
             if sscs == '':
                 continue
+            print sscs
             #current_strategy = base.BaseObject(name=sscs)
             #current_strategy.max_holding = int(cfg.get(sscs,'max_holding'))
             #current_strategy.open_volume = int(cfg.get(sscs,'open_volume'))
