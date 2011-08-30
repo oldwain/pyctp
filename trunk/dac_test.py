@@ -53,12 +53,12 @@ class ModuleTest(unittest.TestCase):
 
     def test_xatr(self):
         self.assertEquals([],xatr([],[]))
-        self.assertEquals([10*CBASE*CBASE,20*CBASE*CBASE/3],xatr([1000,2000],[100,300]))
+        self.assertEquals([10*CBASE,20*CBASE/3],xatr([1000,2000],[100,300]))
 
     def test_xatr1(self):
         self.assertEquals(0,xatr1([],[],[]))
-        self.assertEquals(2*CBASE*CBASE,xatr1([200],[100],[100]))        
-        self.assertEquals(20*CBASE*CBASE/3,xatr1([1000,2000],[100,300],[10000000,0]))
+        self.assertEquals(2*CBASE,xatr1([200],[100],[100]))        
+        self.assertEquals(20*CBASE/3,xatr1([1000,2000],[100,300],[10000000,0]))
 
     def test_accumulate(self):
         self.assertEquals([],accumulate([]))

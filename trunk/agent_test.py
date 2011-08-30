@@ -35,14 +35,18 @@ class AbsAgentTest(unittest.TestCase):
             self.gi += 1
         xa.put_command(3,command)
         xa.inc_tick()
+        xa.check_commands()
         self.assertEquals(100,self.gi)
         xa.inc_tick()
+        xa.check_commands()
         self.assertEquals(100,self.gi)
         self.assertEquals(1,len(xa.commands))
         xa.inc_tick()
+        xa.check_commands()
         self.assertEquals(101,self.gi)
         self.assertEquals(0,len(xa.commands))
         xa.inc_tick()
+        xa.check_commands()
         self.assertEquals(101,self.gi)  #不会重复计算
 
     def test_check_commands_2(self):
@@ -55,14 +59,18 @@ class AbsAgentTest(unittest.TestCase):
         xa.put_command(3,command)
         xa.put_command(3,command)
         xa.inc_tick()
+        xa.check_commands()
         self.assertEquals(100,self.gi)
         xa.inc_tick()
+        xa.check_commands()
         self.assertEquals(100,self.gi)
         self.assertEquals(2,len(xa.commands))
         xa.inc_tick()
+        xa.check_commands()
         self.assertEquals(102,self.gi)
         self.assertEquals(0,len(xa.commands))
         xa.inc_tick()
+        xa.check_commands()
         self.assertEquals(102,self.gi)  #不会重复计算
 
     def test_check_commands_2b(self):
@@ -75,15 +83,19 @@ class AbsAgentTest(unittest.TestCase):
         xa.put_command(2,command)
         xa.put_command(3,command)
         xa.inc_tick()
+        xa.check_commands()
         self.assertEquals(2,len(xa.commands))
         self.assertEquals(100,self.gi)
         xa.inc_tick()
+        xa.check_commands()
         self.assertEquals(1,len(xa.commands))
         self.assertEquals(101,self.gi)
         xa.inc_tick()
+        xa.check_commands()
         self.assertEquals(102,self.gi)
         self.assertEquals(0,len(xa.commands))
         xa.inc_tick()
+        xa.check_commands()
         self.assertEquals(102,self.gi)  #不会重复计算
 
 
