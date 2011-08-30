@@ -335,9 +335,9 @@ class DATR_SHORT_STOPER(SHORT_STOPER):#日ATR空头止损
         self.tlow = bline
         self.itime = len(self.data.sclose)  #time的索引，用于计算耗时
         self.name = u'空头日ATR止损,初始止损=%s,保本=%s,最大回撤=%s' % (rbase,rkeeper,rdrawdown)
-        self.max_drawdown = int(data.atrd1 * rdrawdown / XBASE + 0.5)
-        self.keeper = int(data.atrd1 * rkeeper / XBASE + 0.5)
-        self.set_cur_stop(bline + int(data.atrd1 * rbase / XBASE + 0.5))
+        self.max_drawdown = int(data.atrd1[-1] * rdrawdown / XBASE + 0.5)
+        self.keeper = int(data.atrd1[-1] * rkeeper / XBASE + 0.5)
+        self.set_cur_stop(bline + int(data.atrd1[-1] * rbase / XBASE + 0.5))
 
     def check(self,tick):
         '''

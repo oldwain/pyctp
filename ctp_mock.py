@@ -194,20 +194,20 @@ import hreader
 
 ctp_mock.log_config()
 
-preday = 20110725
-tday = 20110726
-instrument = 'IF1108'
+preday = 20110819
+tday = 20110822
+instrument = 'IF1109'
 myagent = ctp_mock.create_agent_with_mocktrader(instrument,-1)    #不需要tday的当日数据
 myagent.scur_day = preday
 #myagent.save_flag = True
 myagent.prepare_data_env()
 myagent.scur_day = tday
-#myagent.instruments['IF1108'].data.atrd1
+#myagent.instruments['IF1109'].data.atrd1
 ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
-ctp_mock.run_ticks(ticks,myagent)
+ctp_mock.run_ticks(ticks[:10000],myagent)
 
-len(myagent.instruments['IF1108'].data.sclose)
-len(myagent.instruments['IF1108'].data.tr1)
+len(myagent.instruments['IF1109'].data.sclose)
+len(myagent.instruments['IF1109'].data.tr1)
 
 ################
 #第一次的ticks只到10:02
