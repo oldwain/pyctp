@@ -379,6 +379,9 @@ class LONG_MOVING_STOPER(LONG_STOPER):
         self.name = u'多头移动止损,初始止损=%s,步长=%s/%s,最大回撤=%s' % (self.stop0,vstep,tstep,max_drawdown)
         self.thigh = bline
         self.stime = stime
+        self.tstep = tstep
+        self.vstep = vstep
+        logging.info(self.name)
 
     def check(self,tick):
         '''
@@ -390,8 +393,9 @@ class LONG_MOVING_STOPER(LONG_STOPER):
             return (True,tick.price,stop_changed)
         if tick.price > self.thigh:
             self.thigh = tick.price
-            nstop = self.stop0 + (tick.price - self.bline) / self.tstep * vstep
+            nstop = self.stop0 + (tick.price - self.base_line) / self.tstep * self.vstep
             if nstop > self.get_cur_stop():
+                logging.info(u'移动平仓位置，原平仓点=%s,现平仓点=%s' % (self.get_cur_stop(),nstop))
                 self.set_cur_stop(nstop)
                 stop_changed = True
         return (False,self.get_base_line(),stop_changed)
@@ -403,7 +407,7 @@ class SHORT_MOVING_STOPER(SHORT_STOPER):#空头移动止损
            data:行情对象
            bline: 价格基线
         '''
-        LONG_STOPER.__init__(self,data,bline)
+        SHORT_STOPER.__init__(self,data,bline)
         self.lost_base = lost_base
         self.ticks = 0
         self.set_cur_stop(bline + lost_base)
@@ -411,6 +415,9 @@ class SHORT_MOVING_STOPER(SHORT_STOPER):#空头移动止损
         self.name = u'空头移动止损,初始止损=%s,步长=%s/%s,最大回撤=%s' % (self.stop0,vstep,tstep,max_drawdown)
         self.tlow = bline
         self.stime = stime
+        self.vstep = vstep
+        self.tstep = tstep
+        logging.info(self.name)
 
     def check(self,tick):
         '''
@@ -422,8 +429,11 @@ class SHORT_MOVING_STOPER(SHORT_STOPER):#空头移动止损
             return (True,tick.price,stop_changed)
         if tick.price < self.tlow:
             self.tlow = tick.price
-            nstop = self.stop0 + (tick.price - self.bline) / self.tstep * vstep
+            nstop = self.stop0 - (self.base_line - tick.price) / self.tstep * self.vstep    
+            #nstop = self.stop0 + (tick.price - self.base_line) / self.tstep * self.vstep    #不能这样，因为tick.price<self.base_line,所以会有四舍五入问题，-0.12舍入成-1
             if nstop < self.get_cur_stop():
+                logging.info(u'移动平仓位置，原平仓点=%s,现平仓点=%s,cur_price=%s,self.base_line=%s,stop0=%s' % (self.get_cur_stop(),nstop,tick.price,self.base_line,self.stop0))
+                logging.info(u'dp=%s,dp/tstep=%s' %(tick.price - self.base_line,(tick.price - self.base_line) / self.tstep))
                 self.set_cur_stop(nstop)
                 stop_changed = True
         return (False,self.get_base_line(),stop_changed)

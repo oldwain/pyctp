@@ -194,8 +194,8 @@ import hreader
 
 ctp_mock.log_config()
 
-preday = 20110819
-tday = 20110822
+preday = 20110824
+tday = 20110825
 instrument = 'IF1109'
 myagent = ctp_mock.create_agent_with_mocktrader(instrument,-1)    #不需要tday的当日数据
 myagent.scur_day = preday
@@ -204,7 +204,39 @@ myagent.prepare_data_env()
 myagent.scur_day = tday
 #myagent.instruments['IF1109'].data.atrd1
 ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
-ctp_mock.run_ticks(ticks[:12000],myagent)
+#ctp_mock.run_ticks(ticks,myagent)
+ctp_mock.run_ticks(ticks,myagent)
+
+##推进
+tday = 20110826
+myagent.scur_day = tday
+ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
+ctp_mock.run_ticks(ticks,myagent)
+
+tday = 20110829
+myagent.scur_day = tday
+ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
+ctp_mock.run_ticks(ticks,myagent)
+
+tday = 20110830
+myagent.scur_day = tday
+ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
+ctp_mock.run_ticks(ticks,myagent)
+
+tday = 20110831
+myagent.scur_day = tday
+ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
+ctp_mock.run_ticks(ticks,myagent)
+
+tday = 20110901
+myagent.scur_day = tday
+ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
+ctp_mock.run_ticks(ticks,myagent)
+
+tday = 20110902
+myagent.scur_day = tday
+ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
+ctp_mock.run_ticks(ticks,myagent)
 
 len(myagent.instruments['IF1109'].data.sclose)
 len(myagent.instruments['IF1109'].data.tr1)
