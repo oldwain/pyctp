@@ -281,8 +281,14 @@ def trade_mock(instrument='IF1108'):
     run_ticks(ticks,myagent)
 
 def semi_mock(instrument='IF1109'):
-    tday = time.strftime('%Y%m%d')
-
+    ''' 半模拟
+        实际行情，模拟交易
+    '''
+    tday = int(time.strftime('%Y%m%d'))
+    myagent = create_agent_with_mocktrader(instrument,tday)    #不需要tday的当日数据
+    myagent.resume()
+    return myagent
+    
 
 
 if __name__ == '__main__':

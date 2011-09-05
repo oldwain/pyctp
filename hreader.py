@@ -7,7 +7,7 @@ import logging
 
 from base import *
 
-logger = logging.getLogger('ctp.hreader')    
+#logger = logging.getLogger('ctp.hreader')    
 
 DATA_PATH = 'data/'
 
@@ -58,7 +58,7 @@ def read_min_as_list(filename,length,extractor=extract_std,readfunc = read_data,
     try:
         records = readfunc(filename,extractor)
     except Exception,inst:#读不到数据,默认都为1(避免出现被0除)
-        logger.error(u'文件打开错误，文件名=%s,错误信息=%s' % (filename,str(inst)))
+        logging.error(u'文件打开错误，文件名=%s,错误信息=%s' % (filename,str(inst)))
         n = 0
         return [[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n,[0]*n]
     else:   #正常读取到数据
@@ -84,7 +84,7 @@ def read_last_record(filename,extractor=extract_std,readfunc = read_data):
     try:
         records = readfunc(filename,extractor)
     except Exception,inst:#读不到数据,默认都为1(避免出现被0除)
-        logger.error(u'文件打开错误，文件名=%s,错误信息=%s' % (filename,str(inst)))
+        logging.error(u'文件打开错误，文件名=%s,错误信息=%s' % (filename,str(inst)))
         record = NULL_RECORD
     else:   #正常读取到数据
         #print len(records)
@@ -206,9 +206,9 @@ def check_merge(instrument_id,tday,path=DATA_PATH):
         return True
     else:
         #print u'不需要合并,instrument_id=%s 最后日=%s,当前日=%s' % (instrument_id,last_history_date,cur_date)
-        #logger.debug(u'不需要合并, instrument=%s,最后日=%s,当前日=%s' % (instrument_id,last_history_date,cur_date))
+        #logging.debug(u'不需要合并, instrument=%s,最后日=%s,当前日=%s' % (instrument_id,last_history_date,cur_date))
         print u'不需要合并,instrument_id=%s 最后日=%s,当前日=%s' % (instrument_id,last_history_date,last_current_date)
-        logger.debug(u'不需要合并, instrument=%s,最后日=%s,当前日=%s' % (instrument_id,last_history_date,last_current_date))
+        logging.debug(u'不需要合并, instrument=%s,最后日=%s,当前日=%s' % (instrument_id,last_history_date,last_current_date))
         return False
 
 #####################################################
