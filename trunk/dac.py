@@ -290,7 +290,7 @@ def MA1(data):
     #data.ma_135.append(0)    
     #data.ma_270.append(0)    
     #ma1(data.sclose,1,data.ma_1)    
-    #ma1(data.sclose,5,data.ma_5)
+    ma1(data.sclose,5,data.ma_5)
     #ma1(data.sclose,7,data.ma_7)
     #ma1(data.sclose,10,data.ma_10)
     ma1(data.sclose,13,data.ma_13)

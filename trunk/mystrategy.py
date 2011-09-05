@@ -35,13 +35,106 @@ class day_short_stoper_35(DATR_SHORT_STOPER):#触发后5分钟平仓
         return (False,0,False)
 
 
-class dl_break_nhh(LONG_BREAK): #nhhv的实现
+class dl_break_nhh(LONG_BREAK): #nhh的实现
+    def __init__(self,vbreak=30,vrange=250,vopen=90,vdelay=3):
+        LONG_BREAK.__init__(self)
+        self.vbreak = vbreak
+        self.vrange = vrange
+        self.vopen = vopen
+        self.vdelay = vdelay
+        self.pre_high = 0  #前一分钟的日内高点
+        self.cur_highx = 0  #前vdelay分钟的日内高点
+        self.pre_highx = 0  #前vdelay+1分钟的日内高点
+        self.pre_thigh = 0  #前一分钟突破点
+        self.cur_thigh = 0
+        self.last_min = 0
+        self.last_signal = 0
+        self.thigh = [0] * vdelay
+    
     def check(self,data,ctick):
-        pass
+        opend = data.cur_day.vopen
+        vlow = data.cur_day.vlow
+        if ctick.time != self.last_min:
+            self.pre_thigh = self.cur_thigh
+            self.pre_highx = self.thigh.pop()
+            self.thigh.insert(0,self.pre_high)
+            self.last_min = ctick.time
+            self.cur_high = self.thigh[-1] 
+            thigh = self.cur_high + self.vbreak
+
+            drange = self.cur_high - vlow
+            s1 = vlow + self.vrange + self.vbreak
+            slimit =  s1 if s1 > opend+self.vopen else opend+self.vopen
+            
+            self.cur_thigh = thigh if thigh >slimit else slimit
+            
+            #logging.info(u'当前时间=%s,thigh=%s,pre_thigh=%s' % (ctick.time,self.cur_thigh,self.pre_thigh))
+            #logging.info(u'%s:%s:%s' % (data.sclose[-1],data.ma_13[-1],data.ma_30[-1]))
+        #self.pre_high = data.cur_day.vhighd   
+        self.pre_high = data.cur_day.vhigh #不用服务器上传过来的值，用ticks比较值
+        signal = data.shigh[-1] < self.pre_thigh and ctick.price > self.cur_thigh
+        fsignal = (self.cur_thigh - vlow < opend / 33 
+                and data.sclose[-3] > self.cur_thigh * 0.9966
+                and data.xatr1[-1] < 2500
+                and ctick.min1 > 1035
+                and ctick.min1 < 1436
+            )
+        my_signal = signal and fsignal
+        if my_signal and ctick.time != self.last_signal:# and ctick.time<1300:
+            logging.info(u'发出信号:%s:%s:%s:%s,self.cur_thigh=%s' % ('dl_break_nhh',ctick.time,ctick.sec,ctick.price,self.cur_thigh))
+            logging.info(u'ATR1=%s,ATR30=%s,XATR1=%s,XATR30=%s' % (data.atr1[-1],data.atr30[-1],data.xatr1[-1],data.xatr30[-1]))
+            self.last_signal = ctick.time
+            return (True,0)
+        return (False,0)
 
 class dl_break_nhhv(LONG_BREAK): #nhhv的实现
+    def __init__(self,vbreak=30,vdelay=3,percent=100):
+        LONG_BREAK.__init__(self)
+        self.vbreak = vbreak
+        self.percent = percent
+        self.vdelay = vdelay
+        self.pre_high = 0  #前一分钟的日内高点
+        self.cur_highx = 0  #前vdelay分钟的日内高点
+        self.pre_highx = 0  #前vdelay+1分钟的日内高点
+        self.pre_thigh = 0  #前一分钟突破点
+        self.cur_thigh = 0
+        self.last_min = 0
+        self.last_signal = 0
+        self.thigh = [0] * vdelay
+    
     def check(self,data,ctick):
-        pass
+        opend = data.cur_day.vopen
+        vlow = data.cur_day.vlow
+        if ctick.time != self.last_min:
+            self.pre_thigh = self.cur_thigh
+            self.pre_highx = self.thigh.pop()
+            self.thigh.insert(0,self.pre_high)
+            self.last_min = ctick.time
+            self.cur_high = self.thigh[-1] 
+            thigh = self.cur_high + self.vbreak
+
+            vrange = data.d1[ICLOSE][-1] / self.percent
+            self.cur_thigh = thigh if thigh >= vlow + vrange else vlow + vrange
+            #logging.info(u'ma5=%s,ma13=%s' % (data.ma_5[-1],data.ma_13[-1]))
+            #logging.info(u'当前时间=%s,cur_thigh=%s,pre_thigh=%s,thigh=%s' % (ctick.time,self.cur_thigh,self.pre_thigh,thigh))
+            #logging.info(u'%s:%s:%s' % (data.sclose[-1],data.ma_13[-1],data.ma_30[-1]))
+        #self.pre_high = data.cur_day.vhighd   
+        self.pre_high = data.cur_day.vhigh #不用服务器上传过来的值，用ticks比较值
+        signal = data.shigh[-1] < self.pre_thigh and ctick.price > self.cur_thigh
+        fsignal = (self.cur_thigh - vlow < opend / 33 
+                and data.sclose[-3] > self.cur_thigh * 0.9966
+                and data.xatr1[-1] < 2000
+                and data.ma_5[-1] > data.ma_13[-1]
+                and ctick.min1 > 1035
+                and ctick.min1 < 1436
+            )
+        my_signal = signal and fsignal
+        if my_signal and ctick.time != self.last_signal:# and ctick.time<1300:
+            logging.info(u'发出信号:%s:%s:%s:%s,self.cur_thigh=%s' % ('dl_break_nhh',ctick.time,ctick.sec,ctick.price,self.cur_thigh))
+            logging.info(u'ATR1=%s,ATR30=%s,XATR1=%s,XATR30=%s' % (data.atr1[-1],data.atr30[-1],data.xatr1[-1],data.xatr30[-1]))
+            self.last_signal = ctick.time
+            return (True,0)
+        return (False,0)
 
 class dl_break_mll2(SHORT_BREAK): #mll2的实现
     def __init__(self,length=80,vbreak=10,vrange=270,vrange2=200,tlimit=1325):
@@ -51,6 +144,7 @@ class dl_break_mll2(SHORT_BREAK): #mll2的实现
         self.vrange = vrange
         self.vrange2 = vrange2
         self.tlimit = tlimit
+        self.pre_dlow = 0   #上一分钟日内低点
         self.pre_tlow = 0
         self.cur_tlow = 0
         self.last_min = 0
@@ -64,7 +158,8 @@ class dl_break_mll2(SHORT_BREAK): #mll2的实现
             self.last_min = ctick.time
             self.pre_tlow = self.cur_tlow
             self.cur_tlow = min(data.slow[-self.length:]) + self.vbreak
-            drange = vhigh - data.cur_day.vlow
+            #drange = vhigh - data.cur_day.vlow  #这里有点不同，用到的幅度不是上一分钟的，也用到本分钟
+            drange = vhigh - self.pre_dlow
             if ctick.min1 < self.tlimit and drange < self.vrange:
                 slimit = vhigh - self.vrange
             elif ctick.min1 > self.tlimit and drange < self.vrange:
@@ -75,18 +170,20 @@ class dl_break_mll2(SHORT_BREAK): #mll2的实现
             #self.fsignal = (data.sclose[-1] < self.cur_tlow * 1.0015 and self.cur_tlow < ldmid - 60 and data.ma_13[-1] < data.ma_30[-1] and vhigh - self.cur_tlow < opend / 33)   #因为00归入老的一分钟,所以这里不能这么做
             #logging.info(u'当前时间=%s,tlow=%s,pre_tlow=%s' % (ctick.time,self.cur_tlow,self.pre_tlow))
             #logging.info(u'%s:%s:%s' % (data.sclose[-1],data.ma_13[-1],data.ma_30[-1]))
+        #self.pre_dlow = data.cur_day.vlowd
+        self.pre_dlow = data.cur_day.vlow   #不用服务器上传过来的值，用ticks比较值
         signal = data.slow[-1] > self.pre_tlow and ctick.price < self.cur_tlow
         fsignal = (data.sclose[-1] < self.cur_tlow * 1.0015 
                 and self.cur_tlow < ldmid - 60 
                 and data.ma_13[-1] < data.ma_30[-1] 
                 and vhigh - self.cur_tlow < opend / 33 
-                #and data.xatr1[-1] < 2000
-                #and data.xatr30[-1] < 10000
+                and data.xatr1[-1] < 2000
+                and data.xatr30[-1] < 10000
                 and ctick.min1 > 944 
                 and ctick.min1 < 1445
             )
         my_signal = signal and fsignal
-        if my_signal and ctick.time != self.last_signal and ctick.time<1300:
+        if my_signal and ctick.time != self.last_signal: #and ctick.time<1300:
             logging.info(u'发出信号:%s:%s:%s:%s,self.cur_tlow=%s' % ('dl_break_mll2',ctick.time,ctick.sec,ctick.price,self.cur_tlow))
             logging.info(u'ATR1=%s,ATR30=%s,XATR1=%s,XATR30=%s' % (data.atr1[-1],data.atr30[-1],data.xatr1[-1],data.xatr30[-1]))
             self.last_signal = ctick.time
@@ -95,7 +192,7 @@ class dl_break_mll2(SHORT_BREAK): #mll2的实现
 
 
 class dl_break_mll2v(SHORT_BREAK): #mll2v的实现
-    def __init__(self,length=80,vbreak=10,rvrange=4./3,rvrange2=2./3,wlen=30,vmid=60,tlimit=1325):
+    def __init__(self,length=80,vbreak=10,rvrange=2./3,rvrange2=1./2,wlen=3,vmid=60,tlimit=1325):
         SHORT_BREAK.__init__(self)
         self.length = length
         self.vbreak = vbreak
@@ -104,6 +201,7 @@ class dl_break_mll2v(SHORT_BREAK): #mll2v的实现
         self.wlen = wlen
         self.vmid = vmid
         self.tlimit = tlimit
+        self.pre_dlow = 0   #上一分钟日内低点
         self.pre_tlow = 0
         self.cur_tlow = 0
         self.last_min = 0
@@ -115,10 +213,13 @@ class dl_break_mll2v(SHORT_BREAK): #mll2v的实现
         vhigh = data.cur_day.vhigh
         opend = data.cur_day.vopen
         if ctick.time != self.last_min:
-            self.vwave = (sum(data.d1[IHIGH][-wlen:]) - sum(data.d1[ILOW][-wlen])) / wlen
-            vrange = min(self.vwave * rvrange,opend / 66)
-            vrange2 = min(self.vwave * rvrange2,opend / 66)
-            drange = vhigh - data.cur_day.vlow
+            self.vwave = (sum(data.d1[IHIGH][-self.wlen:]) - sum(data.d1[ILOW][-self.wlen:])) / self.wlen
+            #vrange = min(self.vwave * self.rvrange,opend / 66)
+            #vrange2 = min(self.vwave * self.rvrange2,opend / 66)
+            vrange = self.vwave * self.rvrange
+            vrange2 = self.vwave * self.rvrange2
+            #drange = vhigh - data.cur_day.vlow  #这里有点不同，用到的幅度不是上一分钟的，也用到本分钟
+            drange = vhigh - self.pre_dlow
 
             self.last_min = ctick.time
             self.pre_tlow = self.cur_tlow
@@ -130,8 +231,10 @@ class dl_break_mll2v(SHORT_BREAK): #mll2v的实现
                 self.cur_tlow = tlow if tlow < vhigh - vrange2 else vhigh - vrange2
             else:
                 self.cur_tlow = tlow
-            logging.info(u'当前时间=%s,tlow=%s,pre_tlow=%s' % (ctick.time,self.cur_tlow,self.pre_tlow))
-
+            #logging.info(u'当前时间=%s,src_tlow=%s,cur_tlow=%s,pre_tlow=%s,vrange=%s,vrange2=%s,cprice=%s,vwave=%s' % (ctick.time,tlow,self.cur_tlow,self.pre_tlow,vrange,vrange2,ctick.price,self.vwave))
+            #logging.info(u'\t opend=%s,dhigh=%s' % (opend,vhigh))
+        #self.pre_dlow = data.cur_day.vlowd
+        self.pre_dlow = data.cur_day.vlow   #不用服务器上传过来的值，用ticks比较值
         signal = data.slow[-1] > self.pre_tlow and ctick.price < self.cur_tlow
         fsignal = (data.sclose[-3] < self.cur_tlow * 1.0050 
                 and self.cur_tlow < ldmid - self.vmid
@@ -142,9 +245,9 @@ class dl_break_mll2v(SHORT_BREAK): #mll2v的实现
                 and ctick.min1 > 1000 
                 and ctick.min1 < 1445
             )
-        my_signal = signal and fsignal
-        if my_signal and ctick.time != self.last_signal and ctick.time<1300:
-            logging.info(u'发出信号:%s:%s:%s:%s,self.cur_tlow=%s' % ('dl_break_mll2',ctick.time,ctick.sec,ctick.price,self.cur_tlow))
+        my_signal = signal #and fsignal
+        if my_signal and ctick.time != self.last_signal: #and ctick.time<1300:
+            logging.info(u'发出信号:%s:%s:%s:%s,self.cur_tlow=%s' % ('dl_break_mll2v',ctick.time,ctick.sec,ctick.price,self.cur_tlow))
             self.last_signal = ctick.time
             return (True,0)
         return (False,0)

@@ -1079,6 +1079,7 @@ class Agent(AbsAgent):
                 if order.opened_volume > 0:
                     mysignal = order.stoper.check(ctick)
                     if mysignal[0] != 0:    #止损
+                        logging.info(u'平仓信号,time=%s,inst=%s' % (ctick.min1,cur_inst.name))
                         signals.append(BaseObject(instrument=cur_inst,
                                 volume=order.opened_volume,
                                 direction = order.stoper.direction,
@@ -1089,6 +1090,7 @@ class Agent(AbsAgent):
                                 action_type = XCLOSE,
                             )
                         )
+                        logging.info(u'')
                     if mysignal[2] != 0:#止损位置变化
                         is_touched = True
         if is_touched:
@@ -1346,7 +1348,7 @@ class Agent(AbsAgent):
             logging.info(u'A_RT31,开仓回报');
         else:
             myorder.source_order.on_close(price=int(strade.Price*10+0.1),volume=strade.Volume,trade_time=strade.TradeTime)
-            logging.info(u'A_RT32,平仓回报');
+            logging.info(u'A_RT32,平仓回报,price=%s,time=%s' % (strade.Price,strade.TradeTime));
         self.save_state()
         ##查询可用资金
         #print 'fetch_trading_account'
