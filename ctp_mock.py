@@ -280,13 +280,20 @@ def trade_mock(instrument='IF1108'):
     #    myagent.RtnTick(tick)
     run_ticks(ticks,myagent)
 
-def semi_mock(instrument='IF1109'):
+def semi_mock(instrument='IF1109',base_name='base.ini',base='Base'):
     ''' 半模拟
         实际行情，模拟交易
     '''
     tday = int(time.strftime('%Y%m%d'))
     myagent = create_agent_with_mocktrader(instrument,tday)    #不需要tday的当日数据
+
     myagent.resume()
+
+    base_cfg = config.parse_base(base_name,base)
+    for user in base_cfg.users:
+        agent.make_user(myagent,base_cfg.users[user],user)
+    
+    
     return myagent
     
 
