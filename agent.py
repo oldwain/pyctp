@@ -1516,7 +1516,8 @@ def save_raw(base_name='base.ini',strategy_name='strategy.ini',base='Base',strat
  
     my_insts = strategy_cfg.traces_raw
 
-    my_agent = SaveAgent(None,None,my_insts,{})
+    #my_agent = SaveAgent(None,None,my_insts,{})
+    my_agent = SaveAgent(None,None,my_insts,strategy_cfg)
     
     for user in base_cfg.users:
         make_user(my_agent,base_cfg.users[user],user)

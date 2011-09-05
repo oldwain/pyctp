@@ -280,6 +280,10 @@ def trade_mock(instrument='IF1108'):
     #    myagent.RtnTick(tick)
     run_ticks(ticks,myagent)
 
+def semi_mock(instrument='IF1109'):
+    tday = time.strftime('%Y%m%d')
+
+
 
 if __name__ == '__main__':
     log_config()
