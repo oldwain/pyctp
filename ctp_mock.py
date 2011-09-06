@@ -280,7 +280,7 @@ def trade_mock(instrument='IF1108'):
     #    myagent.RtnTick(tick)
     run_ticks(ticks,myagent)
 
-def semi_mock(instrument='IF1109',base_name='base.ini',base='Base'):
+def semi_mock(instrument='IF1109',base_name='mybase.ini',base='Base'):
     ''' 半模拟
         实际行情，模拟交易
     '''
