@@ -1508,7 +1508,7 @@ def save_raw(base_name='base.ini',strategy_name='strategy.ini',base='Base',strat
         strategy_name是保存strategy设置的文件名
 
     '''
-    logging.basicConfig(filename="ctp_user_agent.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
+    logging.basicConfig(filename="ctp_user_agent.log",level=logging.INFO,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
 
  
     base_cfg = config.parse_base(base_name,base)
