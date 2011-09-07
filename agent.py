@@ -288,14 +288,15 @@ class MdSpiDelegate(MdSpi):
         
 
         #self.logger.debug(u'before write md:')
-        ff = open(hreader.make_tick_filename(ctick.instrument),'a+')
-        #print type(dp.UpdateMillisec),type(dp.OpenInterest),type(dp.Volume),type(dp.BidVolume1)
-        #ff.write(u'%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' % (dp.TradingDay,dp.UpdateTime,dp.UpdateMillisec,dp.OpenInterest,dp.Volume,dp.LastPrice,dp.HighestPrice,dp.LowestPrice,dp.BidPrice1,dp.BidVolume1,dp.AskPrice1,dp.AskVolume1))
-        try:
-            ff.write(u'%(instrument)s,%(date)s,%(min1)s,%(sec)s,%(msec)s,%(holding)s,%(dvolume)s,%(price)s,%(high)s,%(low)s,%(bid_price)s,%(bid_volume)s,%(ask_price)s,%(ask_volume)s\n' % ctick.__dict__)
-        except Exception,inst:
-            print str(depth_market_data),str(depth_market_data.TradingDay),str(depth_market_data.UpdateTime)
-        ff.close()
+        if self.agent.save_flag == True:
+            ff = open(hreader.make_tick_filename(ctick.instrument),'a+')
+            #print type(dp.UpdateMillisec),type(dp.OpenInterest),type(dp.Volume),type(dp.BidVolume1)
+            #ff.write(u'%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' % (dp.TradingDay,dp.UpdateTime,dp.UpdateMillisec,dp.OpenInterest,dp.Volume,dp.LastPrice,dp.HighestPrice,dp.LowestPrice,dp.BidPrice1,dp.BidVolume1,dp.AskPrice1,dp.AskVolume1))
+            try:
+                ff.write(u'%(instrument)s,%(date)s,%(min1)s,%(sec)s,%(msec)s,%(holding)s,%(dvolume)s,%(price)s,%(high)s,%(low)s,%(bid_price)s,%(bid_volume)s,%(ask_price)s,%(ask_volume)s\n' % ctick.__dict__)
+            except Exception,inst:
+                print str(depth_market_data),str(depth_market_data.TradingDay),str(depth_market_data.UpdateTime)
+            ff.close()
         #self.logger.debug(u'after write md:')
         #time.sleep(0.3)
         #self.logger.debug(u'after write sleep:')
