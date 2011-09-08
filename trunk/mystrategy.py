@@ -6,6 +6,16 @@ from base import *
 from strategy import *
 import dac
 
+class min_long_break_30(LONG_BREAK):#每小时中间触发
+    def check(self,data,ctick):
+        #print u'in check,%s:%s' % (ctick.min1,ctick.sec)
+        #if ctick.min1 % 100 == 30 and ctick.sec>58 and ctick.msec==0:
+        if ctick.sec==0 and ctick.msec ==0:
+            logging.info(u'S:min_long_break_30:发出多头信号=%s:%s %s' % (ctick.min1,ctick.sec,ctick.msec))
+            return (True,0)
+        return (False,0)
+
+
 class day_long_break_30(LONG_BREAK):#每小时中间触发
     def check(self,data,ctick):
         #print u'in check,%s:%s' % (ctick.min1,ctick.sec)
@@ -14,7 +24,6 @@ class day_long_break_30(LONG_BREAK):#每小时中间触发
             logging.info(u'S:day_long_break_30:发出多头信号=%s:%s %s' % (ctick.min1,ctick.sec,ctick.msec))
             return (True,0)
         return (False,0)
-
 
 class day_long_stoper_35(DATR_LONG_STOPER):#触发后5分钟平仓
     def check(self,ctick):
@@ -33,7 +42,6 @@ class day_short_stoper_35(DATR_SHORT_STOPER):#触发后5分钟平仓
             logging.info(u'S:day_long_stoper_35:发出多头平仓信号=%s:%s %s' % (ctick.min1,ctick.sec,ctick.msec))
             return (True,ctick.low,False)
         return (False,0,False)
-
 
 class dl_break_nhh(LONG_BREAK): #nhh的实现
     def __init__(self,vbreak=30,vrange=250,vopen=90,vdelay=3):
