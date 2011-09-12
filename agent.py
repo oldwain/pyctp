@@ -630,6 +630,9 @@ class c_instrument(object):
         #   tdata.cur_min是当前分钟的行情，包括开盘,最高,最低,当前价格,持仓,累计成交量
         #   tdata.cur_day是当日的行情，包括开盘,最高,最低,当前价格,持仓,累计成交量, 其中最高/最低有两类，一者是tick的当前价集合得到的，一者是tick中的最高/最低价得到的
         self.t2order = t2order_if if hreader.is_if(self.name) else t2order_com
+        if int(time.strftime('%H%M%S')) > 170000:   #模拟
+            self.t2order = t2order_mock
+
         self.data = BaseObject()
         self.begin_flag = False #save标志，默认第一个不保存, 因为第一次切换的上一个是历史数据
 
@@ -893,10 +896,11 @@ class Agent(AbsAgent):
 
     ##交易处理
     def RtnTick(self,ctick):#行情处理主循环
-        #print u'in my lock, close长度:%s,ma_5长度:%s\n' %(len(self.instrument[ctick.instrument].data.sclose),len(self.instrument[ctick.instrument].data.ma_5))
+        #print u'in my lock, close长度:%s,ma_5长度:%s\n' %(len(self.instruments[ctick.instrument].data.sclose),len(self.instruments[ctick.instrument].data.ma_5))
         inst = ctick.instrument
         if not self.prepare_tick(ctick):    #非法ticks数据
             #print 'invalid ticks'
+            logging.warning(u'非法ticks')
             return 
         #先平仓
         close_positions = self.check_close_signal(ctick)
@@ -1574,14 +1578,39 @@ def save2():
     return save(base_name='mybase.ini')
 
 
+def create_trader(name='base.ini',base='Base'):
+    logging.basicConfig(filename="ctp_trade.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
+    
+    trader = TraderApi.CreateTraderApi("trader")
+    
+    strategy_cfg = config.parse_strategy()
+    cfg = config.parse_base(name,base)
+
+    cuser = cfg.traders.values()[0]
+    
+    myagent = agent.Agent(trader,cuser,[instrument],strategy_cfg) 
+    myspi = TraderSpiDelegate(instruments=myagent.instruments, 
+                             broker_id=cuser.broker_id,
+                             investor_id= cuser.investor_id,
+                             passwd= cuser.passwd,
+                             agent = myagent,
+                       )
+    trader.RegisterSpi(myspi)
+    trader.SubscribePublicTopic(THOST_TERT_QUICK)
+    trader.SubscribePrivateTopic(THOST_TERT_QUICK)
+    trader.RegisterFront(cuser.port)
+    trader.Init()
+    return trader,myagent
+
+
 def trade_test_main(name='base.ini',base='Base'):
     '''
-import agent
-trader,myagent = agent.trade_test_main()
-#开仓
-
-##释放连接
-trader.RegisterSpi(None)
+    import agent
+    trader,myagent = agent.trade_test_main()
+    #开仓
+    
+    ##释放连接
+    trader.RegisterSpi(None)
     '''
     logging.basicConfig(filename="ctp_trade.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
     
