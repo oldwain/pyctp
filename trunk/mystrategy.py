@@ -6,12 +6,13 @@ from base import *
 from strategy import *
 import dac
 
-class min_long_break_30(LONG_BREAK):#每小时中间触发
+class min_long_break(LONG_BREAK):#每分钟触发
     def check(self,data,ctick):
         #print u'in check,%s:%s' % (ctick.min1,ctick.sec)
+        logging.info(u'in check,%s:%s' % (ctick.min1,ctick.sec))
         #if ctick.min1 % 100 == 30 and ctick.sec>58 and ctick.msec==0:
-        if ctick.sec==0 and ctick.msec ==0:
-            logging.info(u'S:min_long_break_30:发出多头信号=%s:%s %s' % (ctick.min1,ctick.sec,ctick.msec))
+        if ctick.sec%3 == 1 and ctick.msec ==0:
+            logging.info(u'S:min_long_break:发出多头信号=%s:%s %s' % (ctick.min1,ctick.sec,ctick.msec))
             return (True,0)
         return (False,0)
 

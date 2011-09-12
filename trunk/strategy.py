@@ -62,6 +62,8 @@ class Order(object):
         
     def on_close(self,price,volume,trade_time):
         self.opened_volume -= volume
+        #self.volume = self.opened_volume    #已经开始平仓，必然没有待成交的目标 #这个假设可能有问题??
+        self.volume -= volume
         self.trade_detail.append((price,-volume,trade_time))
         logging.info('on close')
         self.position.re_calc()

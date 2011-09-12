@@ -282,6 +282,22 @@ def trade_mock(instrument='IF1108'):
 
 def semi_mock(instrument='IF1109',base_name='mybase.ini',base='Base'):
     ''' 半模拟
+        实际行情，mock交易
+    '''
+    logging.basicConfig(filename="ctp_semi_mock.log",level=logging.INFO,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')    
+    tday = int(time.strftime('%Y%m%d'))
+    myagent = create_agent_with_mocktrader(instrument,tday)    #不需要tday的当日数据
+
+    myagent.resume()
+
+    base_cfg = config.parse_base(base_name,base)
+    for user in base_cfg.users:
+        agent.make_user(myagent,base_cfg.users[user],user)
+    
+    return myagent
+
+def comp_mock(instrument='IF1109',base_name='mybase.ini',base='Base'):
+    ''' 全模拟
         实际行情，模拟交易
     '''
     logging.basicConfig(filename="ctp_semi_mock.log",level=logging.INFO,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')    
@@ -295,6 +311,7 @@ def semi_mock(instrument='IF1109',base_name='mybase.ini',base='Base'):
         agent.make_user(myagent,base_cfg.users[user],user)
     
     return myagent
+
 
 
 if __name__ == '__main__':
