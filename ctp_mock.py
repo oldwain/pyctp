@@ -29,7 +29,7 @@ import UserApiType as utype
 from base import *
 
 class TraderMock(object):
-    def initialize(self,myagent):
+    def __init__(self,myagent):
         self.myagent = myagent
         self.available = 1000000    #初始100W
 
@@ -167,12 +167,13 @@ class NULLAgent(object):
         pass
 
 def create_agent_with_mocktrader(instrument,tday):
-    trader = TraderMock()
+    trader = TraderMock(None)
     strategy_cfg = config.parse_strategy()
 
     ##这里没有考虑现场恢复，state中需注明当日
     cuser = BaseObject(broker_id='test',port=1111,investor_id='test',passwd='test')
     myagent = agent.Agent(trader,cuser,[instrument],strategy_cfg,tday=tday) 
+    trader.myagent = myagent
 
     req = BaseObject(InstrumentID=instrument)
     trader.ReqQryInstrumentMarginRate(req)
@@ -189,6 +190,7 @@ def log_config():
     config_logging('ctp_trade_mock.log',console_level=logging.INFO)
 
 '''
+import base
 import ctp_mock
 import hreader
 
@@ -198,6 +200,7 @@ preday = 20110824
 tday = 20110825
 instrument = 'IF1109'
 myagent = ctp_mock.create_agent_with_mocktrader(instrument,-1)    #不需要tday的当日数据
+myagent.instruments['IF1109'].t2order = base.t2order_if
 myagent.scur_day = preday
 #myagent.save_flag = True
 myagent.prepare_data_env()
@@ -301,11 +304,13 @@ def comp_mock(instrument='IF1109',base_name='mybase.ini',base='Base'):
         实际行情，模拟交易
     '''
     logging.basicConfig(filename="ctp_semi_mock.log",level=logging.INFO,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')    
-    tday = int(time.strftime('%Y%m%d'))
-    myagent = create_agent_with_mocktrader(instrument,tday)    #不需要tday的当日数据
+    #tday = int(time.strftime('%Y%m%d'))
+    #myagent = create_agent_with_mocktrader(instrument,tday)    #不需要tday的当日数据
+    trader,myagent = agent.create_trader([instrument])
 
     myagent.resume()
 
+    #用实际行情
     base_cfg = config.parse_base(base_name,base)
     for user in base_cfg.users:
         agent.make_user(myagent,base_cfg.users[user],user)

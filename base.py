@@ -126,6 +126,8 @@ def calc_t2order(begin,end,(mid1,mid2)=(1130,1300)):
 
     for i in range(mid2,end):
         it = i/100 * 60 + i%100
+        if i%100 > 59:
+            continue
         t2order[i] = it - nbegin - 90
 
     t2order[end] = it - nbegin - 90
