@@ -167,7 +167,7 @@ INSTS = [
          u'zn1104',u'zn1105'
         ]
 
-INSTS_SAVE = [
+INSTS_SAVE = [  #已经废掉
          u'IF1104',u'IF1105',
          #郑州   
          u'CF109',u'CF111',
@@ -197,6 +197,8 @@ INSTS_SAVE = [
 #INSTS = [u'IF1102']
 
 #mylock = thread.allocate_lock()
+
+dir_py2ctp = lambda dir : '0' if dir == LONG else '1'
 
 
 class MdSpiDelegate(MdSpi):
@@ -319,7 +321,7 @@ class MdSpiDelegate(MdSpi):
             rev.ask_price = int(market_data.AskPrice1*10+0.1)
             rev.ask_volume = market_data.AskVolume1
             rev.date = int(market_data.TradingDay)
-            rev.time = rev.date%10000 * 10000+ rev.min1*100 + rev.sec
+            rev.time = rev.date%10000 * 1000000+ rev.min1*100 + rev.sec
         except Exception,inst:
             self.logger.warning(u'MD:行情数据转换错误:%s' % str(inst))
         return rev
@@ -632,6 +634,8 @@ class c_instrument(object):
         self.t2order = t2order_if if hreader.is_if(self.name) else t2order_com
         if int(time.strftime('%H%M%S')) > 170000:   #模拟
             self.t2order = t2order_mock
+        elif int(time.strftime('%H%M%S')) > 151500:   #模拟
+            self.t2order = t2order_mock2
 
         self.data = BaseObject()
         self.begin_flag = False #save标志，默认第一个不保存, 因为第一次切换的上一个是历史数据
@@ -675,6 +679,7 @@ class c_instrument(object):
         return (price + SLIPPAGE_BASE * self.tick_base if direction == LONG else price-SLIPPAGE_BASE * self.tick_base)/10.0
 
     def get_order(self,vtime):
+        #print self.t2order
         return self.t2order[vtime]
 
 class AbsAgent(object):
@@ -735,8 +740,8 @@ class Agent(AbsAgent):
         ##
         self.trader = trader
         #self.trader.myagent = self
-        if trader != None:
-            trader.initialize(self)
+        #if trader != None:
+        #    trader.initialize(self)
         self.cuser = cuser
         self.strategy_cfg = strategy_cfg
         self.strategy = strategy_cfg.strategy
@@ -1087,7 +1092,7 @@ class Agent(AbsAgent):
                         logging.info(u'平仓信号,time=%s,inst=%s' % (ctick.min1,cur_inst.name))
                         signals.append(BaseObject(instrument=cur_inst,
                                 volume=order.opened_volume,
-                                direction = order.stoper.direction,
+                                direction = dir_py2ctp(order.stoper.direction),
                                 base_price = mysignal[1],
                                 target_price=order.stoper.calc_target_price(mysignal[1],cur_inst.tick_base),
                                 source_order = order, #原始头寸
@@ -1131,6 +1136,7 @@ class Agent(AbsAgent):
                                 target_price=ss.opener.calc_target_price(base_price,cur_inst.tick_base),
                                 mytime = ctick.time,
                                 action_type=XOPEN,
+                                #direction = dir_py2ctp(ss.opener.direction),#内部根据策略处理
                             )
                 ##这里不处理保证金，直接使用理论开仓数。后面在实际开仓时才处理
                 #candidate.volume,margin_amount = self.calc_open_volume(cur_inst,candidate)
@@ -1578,7 +1584,7 @@ def save2():
     return save(base_name='mybase.ini')
 
 
-def create_trader(name='base.ini',base='Base'):
+def create_trader(instruments,name='base.ini',base='Base'):
     logging.basicConfig(filename="ctp_trade.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
     
     trader = TraderApi.CreateTraderApi("trader")
@@ -1586,9 +1592,10 @@ def create_trader(name='base.ini',base='Base'):
     strategy_cfg = config.parse_strategy()
     cfg = config.parse_base(name,base)
 
+    #模拟trader
     cuser = cfg.traders.values()[0]
     
-    myagent = agent.Agent(trader,cuser,[instrument],strategy_cfg) 
+    myagent = Agent(trader,cuser,instruments,strategy_cfg) 
     myspi = TraderSpiDelegate(instruments=myagent.instruments, 
                              broker_id=cuser.broker_id,
                              investor_id= cuser.investor_id,
