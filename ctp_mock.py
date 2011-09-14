@@ -318,7 +318,6 @@ def comp_mock(instrument='IF1109',base_name='mybase.ini',base='Base'):
     return myagent
 
 
-
 if __name__ == '__main__':
     log_config()
     trade_mock()

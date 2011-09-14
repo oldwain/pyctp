@@ -410,6 +410,7 @@ class TraderSpiDelegate(TraderSpi):
         self.logger.info(u'TD:取上一日结算单信息并确认,BrokerID=%s,investorID=%s' % (self.broker_id,self.investor_id))
         req = ustruct.QrySettlementInfo(BrokerID=self.broker_id,InvestorID=self.investor_id,TradingDay=u'')
         #print req.BrokerID,req.InvestorID,req.TradingDay
+        time.sleep(1)
         self.api.ReqQrySettlementInfo(req,self.agent.inc_request_id())
 
     def confirm_settlement_info(self):
@@ -422,8 +423,9 @@ class TraderSpiDelegate(TraderSpi):
         if(self.resp_common(pRspInfo,bIsLast,u'结算单查询')>0):
             self.logger.info(u'TD:结算单内容:%s' % pSettlementInfo.Content)
             self.confirm_settlement_info()
-        else:
-            self.agent.initialize()
+        else:  #这里是未完成分支,需要直接忽略
+            #self.agent.initialize()
+            pass
             
 
     def OnRspQrySettlementInfoConfirm(self, pSettlementInfoConfirm, pRspInfo, nRequestID, bIsLast):
@@ -497,7 +499,7 @@ class TraderSpiDelegate(TraderSpi):
 
     def OnRspQryInvestorPositionDetail(self, pInvestorPositionDetail, pRspInfo, nRequestID, bIsLast):
         '''请求查询投资者持仓明细响应'''
-        #print str(pInvestorPositionDetail)
+        logging.info(str(pInvestorPositionDetail))
         if self.isRspSuccess(pRspInfo): #每次一个单独的数据报
             self.agent.rsp_qry_position_detail(pInvestorPositionDetail)
         else:
@@ -887,6 +889,7 @@ class Agent(AbsAgent):
         req = ustruct.QryInstrument(
                         InstrumentID=instrument_id,
                 )
+        time.sleep(1)
         r = self.trader.ReqQryInstrument(req,self.inc_request_id())
         logging.info(u'A:查询合约, 函数发出返回值:%s' % r)
 
@@ -1401,7 +1404,7 @@ class Agent(AbsAgent):
         '''
             查询持仓回报, 每个合约最多得到4个持仓回报，历史多/空、今日多/空
         '''
-        #print u'agent 持仓:',str(position)
+        logging.info(u'agent 持仓:%s' % str(position))
         if position != None:    
             cur_position = self.instruments[position.InstrumentID].position
             if position.PosiDirection == utype.THOST_FTDC_PD_Long:
@@ -1594,7 +1597,9 @@ def create_trader(instruments,name='base.ini',base='Base'):
 
     #模拟trader
     cuser = cfg.traders.values()[0]
-    
+    logging.info(u'broker_id=%s,investor_id=%s,passwd=%s' % (cuser.broker_id,cuser.investor_id,cuser.passwd))
+
+
     myagent = Agent(trader,cuser,instruments,strategy_cfg) 
     myspi = TraderSpiDelegate(instruments=myagent.instruments, 
                              broker_id=cuser.broker_id,

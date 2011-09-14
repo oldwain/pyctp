@@ -287,6 +287,10 @@ class LONG_STOPER(STOPER):
         return base_price - tick_base * self.max_overflow
 
 
+    def check(self,tick):
+        return (False,0,False)
+
+
 class SHORT_STOPER(STOPER):
     def __init__(self,data,bline,max_overflow=120,valid_length=STOP_VALID_LENGTH):
         STOPER.__init__(self,data,bline)
@@ -297,6 +301,9 @@ class SHORT_STOPER(STOPER):
 
     def calc_target_price(self,base_price,tick_base):#计算空头平仓加价,
         return base_price + tick_base * self.max_overflow
+
+    def check(self,tick):
+        return (False,0,False)
 
 
 class DATR_LONG_STOPER(LONG_STOPER):#日ATR多头止损
