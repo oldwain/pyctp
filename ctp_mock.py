@@ -306,7 +306,7 @@ def comp_mock(instrument='IF1109',base_name='mybase.ini',base='Base'):
     logging.basicConfig(filename="ctp_semi_mock.log",level=logging.INFO,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')    
     #tday = int(time.strftime('%Y%m%d'))
     #myagent = create_agent_with_mocktrader(instrument,tday)    #不需要tday的当日数据
-    trader,myagent = agent.create_trader([instrument])
+    trader,myagent = agent.create_trader([instrument],name='mybase.ini',base='Base_Mock')
 
     myagent.resume()
 
