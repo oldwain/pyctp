@@ -286,7 +286,7 @@ def trade_mock(instrument='IF1108'):
     #    myagent.RtnTick(tick)
     run_ticks(ticks,myagent)
 
-def semi_mock(instrument='IF1109',base_name='mybase.ini',base='Base'):
+def semi_mock(instrument='IF1110',base_name='mybase.ini',base='Base'):
     ''' 半模拟
         实际行情，mock交易
     '''
@@ -302,14 +302,14 @@ def semi_mock(instrument='IF1109',base_name='mybase.ini',base='Base'):
     
     return myagent
 
-def comp_mock(instrument='IF1109',base_name='mybase.ini',base='Base'):
+def comp_mock(base_name='mybase.ini',base='Base'):
     ''' 全模拟
         实际行情，模拟交易
     '''
-    logging.basicConfig(filename="ctp_semi_mock.log",level=logging.INFO,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')    
+    logging.basicConfig(filename="ctp_comp_mock.log",level=logging.INFO,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')    
     #tday = int(time.strftime('%Y%m%d'))
     #myagent = create_agent_with_mocktrader(instrument,tday)    #不需要tday的当日数据
-    trader,myagent = agent.create_trader([instrument],name='mybase.ini',base='Base_Mock')
+    trader,myagent = agent.create_trader(name='mybase.ini',base='Base_Mock')
 
     myagent.resume()
 
