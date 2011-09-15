@@ -140,5 +140,5 @@ t2order_if = calc_t2order(914,1515)
 t2order_com = calc_t2order(859,1500)
 
 #模拟
-t2order_mock = calc_t2order(1800,2230,(2015,2015))
+t2order_mock = calc_t2order(1900,2330,(2115,2115))
 t2order_mock2 = calc_t2order(1500,1930,(1715,1715))

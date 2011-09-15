@@ -398,7 +398,8 @@ class LONG_MOVING_STOPER(LONG_STOPER):
             基准价为0则为当前价
         '''
         stop_changed = False
-        if tick.price < self.get_cur_stop() or tick.time >= self.stime:
+        if tick.price < self.get_cur_stop() or tick.min1 >= self.stime:
+            logging.info(u'LMS_C:tick.time=%s,tick.min1=%s,tick.price=%s,cur_stop=%s' % (tick.time,tick.min1,tick.price,self.get_cur_stop()))
             return (True,tick.price,stop_changed)
         if tick.price > self.thigh:
             self.thigh = tick.price
@@ -434,7 +435,7 @@ class SHORT_MOVING_STOPER(SHORT_STOPER):#空头移动止损
             基准价为0则为当前价
         '''
         stop_changed = False
-        if tick.price > self.get_cur_stop() or tick.time >= self.stime:
+        if tick.price > self.get_cur_stop() or tick.min1 >= self.stime:
             return (True,tick.price,stop_changed)
         if tick.price < self.tlow:
             self.tlow = tick.price
@@ -447,8 +448,8 @@ class SHORT_MOVING_STOPER(SHORT_STOPER):#空头移动止损
                 stop_changed = True
         return (False,self.get_base_line(),stop_changed)
 
-if_lmv_stoper = fcustom(LONG_MOVING_STOPER,stime = 1500)
-if_smv_stoper = fcustom(SHORT_MOVING_STOPER,stime = 1500)
+if_lmv_stoper = fcustom(LONG_MOVING_STOPER,stime = 1459)
+if_smv_stoper = fcustom(SHORT_MOVING_STOPER,stime = 1459)
 
 
 class STRATEGY(object):#策略基类, 单纯包装

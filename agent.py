@@ -1106,7 +1106,9 @@ class Agent(AbsAgent):
                                 action_type = XCLOSE,
                             )
                         )
-                        logging.info(u'')
+                        #TODO:这里需要设定虚拟被平，就是说如果已经启动平仓了，就不能下一秒再平
+                        #     或者更进一步，直接认为平仓必然成功，然后设定已经被平标志，默认已经被平  
+                        #logging.info(u'')
                     if mysignal[2] != 0:#止损位置变化
                         is_touched = True
         if is_touched:
@@ -1355,7 +1357,7 @@ class Agent(AbsAgent):
                    在OnTrade中进行position的细致处理 
             #TODO: 必须处理策略分类持仓汇总和持仓总数不匹配时的问题
         '''
-        logging.info(u'A_RT1:成交回报,%s:orderref=%s,orders=%s' % (self.instruments,strade.OrderRef,self.ref2order))
+        logging.info(u'A_RT1:成交回报,%s:orderref=%s,orders=%s,price=%s' % (self.instruments,strade.OrderRef,self.ref2order,strade.Price))
         if int(strade.OrderRef) not in self.ref2order or strade.InstrumentID not in self.instruments:
             logging.warning(u'A_RT2:收到非本程序发出的成交回报:%s-%s' % (strade.InstrumentID,strade.OrderRef))
         cur_inst = self.instruments[strade.InstrumentID]
@@ -1590,7 +1592,7 @@ def save2():
     return save(base_name='mybase.ini')
 
 
-def create_trader(instruments,name='base.ini',base='Base'):
+def create_trader(name='base.ini',base='Base'):
     logging.basicConfig(filename="ctp_trade.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
     
     trader = TraderApi.CreateTraderApi("trader")
@@ -1602,7 +1604,7 @@ def create_trader(instruments,name='base.ini',base='Base'):
     cuser = cfg.traders.values()[0]
     logging.info(u'broker_id=%s,investor_id=%s,passwd=%s' % (cuser.broker_id,cuser.investor_id,cuser.passwd))
 
-
+    instruments = list(strategy_cfg.traces_raw)
     myagent = Agent(trader,cuser,instruments,strategy_cfg) 
     myspi = TraderSpiDelegate(instruments=myagent.instruments, 
                              broker_id=cuser.broker_id,
