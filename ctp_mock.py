@@ -314,7 +314,7 @@ def comp_mock(base_name='mybase.ini',base='Base'):
     myagent.resume()
 
     #用实际行情
-    base_cfg = config.parse_base(base_name,base)
+    base_cfg = config.parse_base(base_name,'Base_Mock')
     for user in base_cfg.users:
         agent.make_user(myagent,base_cfg.users[user],user)
     
