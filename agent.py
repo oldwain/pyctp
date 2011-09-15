@@ -937,7 +937,7 @@ class Agent(AbsAgent):
         ctick.iorder = dinst.get_order(ctick.min1)
         if (ctick.iorder < dinst.data.cur_min.viorder and ctick.date == dinst.data.cur_min.vdate) or ctick.date < dinst.data.cur_min.vdate:
             #print ctick.date,ctick.time,dinst.data.cur_min.vdate,dinst.data.cur_min.vtime
-            #logging.info(u'过滤:time=%s' % (ctick.time))
+            logging.info(u'过滤:time=%s,ctick.iorder=%s,ctick.date=%s,ddc.viorder=%s,ddc.vdate=%s' % (ctick.time,ctick.iorder,ctick.date,dinst.data.cur_min.viorder,dinst.data.cur_min.vdate))
             return False
         if(self.prepare_base(dinst,ctick)):  #如果切分分钟则返回>0
             for func in self.data_funcs:    #动态计算
@@ -958,7 +958,10 @@ class Agent(AbsAgent):
             else:   #不存在151500或150000.则将最后一分钟保存
                 self.save_min(dinst)
             '''
-            last_current_time = hreader.read_current_last_c(dinst.name,self.scur_day).time
+            try:
+                last_current_time = hreader.read_current_last_c(dinst.name,self.scur_day).time
+            except:
+                last_current_time = 0
             logging.info(u'A_DF:cur_time=%s,last_min=%s' %(last_current_time,last_min))
             if last_current_time < last_min:    #如果已经有当分钟的记录，就不再需要保存了。
                 self.save_min(dinst)  
