@@ -11,7 +11,7 @@ class min_long_break(LONG_BREAK):#每分钟触发
         #print u'in check,%s:%s' % (ctick.min1,ctick.sec)
         logging.info(u'in check,%s:%s:%s' % (ctick.min1,ctick.sec,ctick.msec))
         #if ctick.min1 % 100 == 30 and ctick.sec>58 and ctick.msec==0:
-        if ctick.sec == 0:#and ctick.msec ==0:
+        if ctick.sec <= 3:#and ctick.msec ==0:
             logging.info(u'S:min_long_break:发出多头信号=%s:%s %s' % (ctick.min1,ctick.sec,ctick.msec))
             return (True,0)
         return (False,0)
