@@ -47,6 +47,7 @@ class Order(object):
         self.stoper = None
         self.trade_detail = []
         self.cancelled = False  #是否已经撤单
+        self.close_lock = False #平仓锁定，即已经发出平仓信号
 
     def on_trade(self,price,volume,trade_time):
         ''' 返回是否完全成交
@@ -85,6 +86,10 @@ class Order(object):
 
     def get_strategy_name(self):
         return self.position.strategy.name
+
+    def release_close_lock(self):
+        logging.info(u'释放平仓锁,order=%s' % self.__str__())
+        self.close_lock = False
 
     def __str__(self):
         return u'Order_A: 合约=%s,开仓策略=%s,方向=%s,目标数=%s,开仓数=%s,状态=%s' % (self.instrument.name,
@@ -127,7 +132,7 @@ class Position(object):
         #本次可开仓数 = 策略单次开仓数 和 剩余开仓总数 的小者
         #print 'self.strategy.open_volume:%s' % (self.strategy.open_volume,)
         can_open = self.strategy.open_volume if self.strategy.open_volume <=  remained else remained
-        logging.info(u'P_COV_2:计算头寸可开仓数完成,可开数=%s,%s:Pos=%s' % (can_open,self.instrument.name,str(self)))
+        logging.info(u'P_COV_2:计算头寸可开仓数完成,可开数=%s,%s:Pos=%s,策略允许数=%s,资金允许数=%s' % (can_open,self.instrument.name,str(self),self.strategy.open_volume,remained))
         return can_open
 
     def re_calc(self): #
@@ -252,7 +257,7 @@ class day_short_break(SHORT_BREAK):
         calc_target_price(self,base_price,tick_base) #计算平仓限价, 其中tick_base是每跳幅度
 '''
 
-STOP_VALID_LENGTH = 2   #最好是1秒后就撤单, 以便及时追平
+STOP_VALID_LENGTH = 6   #最好是1秒后就撤单, 以便及时追平. 但是因为平仓回报比较慢，需要等待?
 
 class STOPER(Resumable):    #离场类标记
     '''
@@ -448,7 +453,7 @@ class SHORT_MOVING_STOPER(SHORT_STOPER):#空头移动止损
                 stop_changed = True
         return (False,self.get_base_line(),stop_changed)
 
-if_lmv_stoper = fcustom(LONG_MOVING_STOPER,stime = 1459)
+if_lmv_stoper = fcustom(LONG_MOVING_STOPER,stime = 2459)
 if_smv_stoper = fcustom(SHORT_MOVING_STOPER,stime = 1459)
 
 

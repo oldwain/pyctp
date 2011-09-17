@@ -720,7 +720,7 @@ class AbsAgent(object):
         #    pass
         #    print 'in check command,len=%s,self.tick=%s,command time=%s' % (l,self.tick,self.commands[-1][0])
         while(i<l and self.tick >= self.commands[i][0]):
-            logging.debug(u'AA_C:exec command,i=%s,tick=%s,command[i][0]=%s' % (i,self.tick,self.commands[i][0]))
+            logging.info(u'AA_C:exec command,i=%s,tick=%s,command[i][0]=%s' % (i,self.tick,self.commands[i][0]))
             self.commands[i][1]()
             i += 1
         if i>0:
@@ -1092,9 +1092,9 @@ class Agent(AbsAgent):
         is_touched = False  #止损位变化
         for position in cur_inst.position_detail.values():
             for order in position.orders:
-                if order.opened_volume > 0:
+                if order.opened_volume > 0 and order.close_lock == False:
                     mysignal = order.stoper.check(ctick)
-                    if mysignal[0] != 0:    #止损
+                    if mysignal[0] != 0 and order.close_lock == False:    #止损
                         logging.info(u'平仓信号,time=%s,inst=%s' % (ctick.min1,cur_inst.name))
                         signals.append(BaseObject(instrument=cur_inst,
                                 volume=order.opened_volume,
@@ -1108,7 +1108,7 @@ class Agent(AbsAgent):
                         )
                         #TODO:这里需要设定虚拟被平，就是说如果已经启动平仓了，就不能下一秒再平
                         #     或者更进一步，直接认为平仓必然成功，然后设定已经被平标志，默认已经被平  
-                        #logging.info(u'')
+                        order.close_lock = True
                     if mysignal[2] != 0:#止损位置变化
                         is_touched = True
         if is_touched:
@@ -1174,18 +1174,20 @@ class Agent(AbsAgent):
         logging.info(u'计算并虚拟锁定实际开仓数')
         want_volume = order.position.calc_open_volume()
         inst_remained = order.instrument.calc_remained_volume()
+        logging.info(u'A_COV1:want_volume=%s,inst_remained=%s' % (want_volume,inst_remained))
         if want_volume > inst_remained:
             want_volume = inst_remained
         if want_volume <= 0:
             return 0
         margin_amount = instrument.calc_margin_amount(order.target_price,order.position.strategy.direction)
-        logging.debug(u'A_COV:理论开仓数:%s,单手保证金:%s' % (want_volume,margin_amount))
+        logging.info(u'A_COV2:理论开仓数:%s,单手保证金:%s' % (want_volume,margin_amount))
         if margin_amount <= 1:#不可能只有1块钱
             logging.error(u'合约%s保证金率未初始化' % (instrument.name,))
         available_volume = int(self.available / margin_amount)
-        logging.debug(u'A_COV:可用保证金=%s,单手保证金=%s' % (int(self.available),margin_amount))
+        logging.debug(u'A_COV3:可用保证金=%s,单手保证金=%s' % (int(self.available),margin_amount))
         if available_volume == 0:
             return 0
+        logging.info(u'A_COV4:want_volume=%s,avaliable_volume=%s' % (want_volume,available_volume))
         if want_volume > available_volume:
             want_volume = available_volume
         self.available -= (want_volume *margin_amount)  #保证金虚拟锁定，在成交后解锁(必须是全部成交)或撤单后解锁
@@ -1228,7 +1230,9 @@ class Agent(AbsAgent):
                 #self.ref2order[command.order_ref] = order.source_order
                 self.ref2order[command.order_ref] = order   #2011-8-6
                 self.put_command(self.get_tick()+order.source_order.stoper.valid_length,fcustom(self.cancel_command,command=command))
+                self.put_command(self.get_tick()+order.source_order.stoper.valid_length,lambda : order.source_order.release_close_lock())
                 self.close_position(command)
+                logging.info(u'发出平仓指令，cur_tick=%s,释放锁的时间是=%s' % (self.get_tick(),self.get_tick()+order.source_order.stoper.valid_length))
 
     def open_position(self,order):
         ''' 
@@ -1257,18 +1261,26 @@ class Agent(AbsAgent):
         logging.info(u'下单: instrument=%s,方向=%s,数量=%s,价格=%s' % (order.instrument,u'多' if order.direction==utype.THOST_FTDC_D_Buy else u'空',order.volume,order.price))
         r = self.trader.ReqOrderInsert(req,self.inc_request_id())
 
-
+    #def close_position(self,order,CombOffsetFlag = utype.THOST_FTDC_OF_Close): #Close==CloseYesterday
     def close_position(self,order,CombOffsetFlag = utype.THOST_FTDC_OF_CloseToday):
         ''' 
             发出平仓指令. 默认平今仓
+            是平今还是平昨，可以通过order的mytime解决
         '''
+        sorder = self.ref2order[order.order_ref].source_order
+        sday = sorder.mytime/1000000    #MMDD
+        cday = self.scur_day % 10000    #MMDD
+        logging.info(u'平仓: sday=%s,cday=%s' % (sday,cday))
+        cos_flag = utype.THOST_FTDC_OF_CloseToday if sday >= cday else utype.THOST_FTDC_OF_Close    #sday>cday只会在模拟中出现，否则就是穿越了
+
         req = ustruct.InputOrder(
                 InstrumentID = order.instrument,
                 Direction = order.direction,
                 OrderRef = str(order.order_ref),
                 LimitPrice = order.price,
                 VolumeTotalOriginal = order.volume,
-                CombOffsetFlag = CombOffsetFlag,
+                #CombOffsetFlag = CombOffsetFlag,
+                CombOffsetFlag = cos_flag,
                 OrderPriceType = utype.THOST_FTDC_OPT_LimitPrice,
                 
                 BrokerID = self.cuser.broker_id,
