@@ -50,7 +50,7 @@ def read_records(data,extractor):
     for line in data:
         if len(line.strip()) > 0:
             record = extractor(line)
-            if record.time < 1516 and record.time > 850:  #排除错误数据
+            if record.time < 1516 and record.time > 850 or ('min1' in record.__dict__ and record.min1 < 1516 and record.min1 > 850):  #排除错误数据
                 records.append(record)
     return records
 
@@ -407,7 +407,6 @@ def extract_tick(line):
     rev = BaseObject()
     rev.date = int(items[1])
     rev.min1 = int(items[2])
-    rev.time = rev.min1
     rev.sec = int(items[3])
     rev.msec = int(items[4])
     rev.holding = int(items[5])
@@ -419,6 +418,9 @@ def extract_tick(line):
     rev.bid_volume = int(items[11])
     rev.ask_price = int(items[12])
     rev.ask_volume = int(items[13])
+    #rev.time = rev.min1
+    rev.time = rev.date%10000 * 1000000+ rev.min1*100 + rev.sec #与market_data2tick一致
+    rev.switch_min = False  #分钟切换
     return rev
 
 def read_ticks(instrument,tday=0,length = 36000,extractor=extract_tick,readfunc = read_data):
