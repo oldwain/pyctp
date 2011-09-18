@@ -322,6 +322,7 @@ class MdSpiDelegate(MdSpi):
             rev.ask_volume = market_data.AskVolume1
             rev.date = int(market_data.TradingDay)
             rev.time = rev.date%10000 * 1000000+ rev.min1*100 + rev.sec
+            rev.switch_min = False  #分钟切换
         except Exception,inst:
             self.logger.warning(u'MD:行情数据转换错误:%s' % str(inst))
         return rev
@@ -999,6 +1000,8 @@ class Agent(AbsAgent):
         if (ctick.iorder == ddata.cur_min.viorder + 1 and (ctick.sec > 0 or ctick.msec>0)) or ctick.iorder > ddata.cur_min.viorder + 1 or ctick.date > ddata.cur_min.vdate:
         #时间切换. 00秒00毫秒属于上一分钟, 但如果下一单是隔了n分钟的，也直接切换
             #logging.info('PB2A:len(m1)=%s' % len(ddata.m1[0]))
+            #logging.info(u'分钟切换,time=%s,min1=%s,pre_iorder=%s,cur_iorder=%s' % (ctick.time,ctick.min1,ddata.cur_min.viorder,ctick.iorder))
+            ctick.switch_min = True
             rev = True
             #print ctick.min1,ddata.cur_min.vtime,ctick.date,ddata.cur_min.vdate
             if (len(ddata.stime)>0 and (ctick.date > ddata.sdate[-1] or ctick.min1 > ddata.stime[-1])) or len(ddata.stime)==0:#已有分钟与已保存的有差别
@@ -1094,8 +1097,8 @@ class Agent(AbsAgent):
             for order in position.orders:
                 if order.opened_volume > 0 and order.close_lock == False:
                     mysignal = order.stoper.check(ctick)
-                    if mysignal[0] != 0 and order.close_lock == False:    #止损
-                        logging.info(u'平仓信号,time=%s,inst=%s' % (ctick.min1,cur_inst.name))
+                    if mysignal[0] != 0 and order.close_lock == False:    #平仓
+                        logging.info(u'平仓信号,time=%s,inst=%s' % (ctick.time,cur_inst.name))
                         signals.append(BaseObject(instrument=cur_inst,
                                 volume=order.opened_volume,
                                 direction = dir_py2ctp(order.stoper.direction),

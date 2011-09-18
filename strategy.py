@@ -453,8 +453,8 @@ class SHORT_MOVING_STOPER(SHORT_STOPER):#空头移动止损
                 stop_changed = True
         return (False,self.get_base_line(),stop_changed)
 
-if_lmv_stoper = fcustom(LONG_MOVING_STOPER,stime = 2459)
-if_smv_stoper = fcustom(SHORT_MOVING_STOPER,stime = 1459)
+if_lmv_stoper = fcustom(LONG_MOVING_STOPER,stime = 1500)
+if_smv_stoper = fcustom(SHORT_MOVING_STOPER,stime = 1500)
 
 
 class STRATEGY(object):#策略基类, 单纯包装
