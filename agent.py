@@ -1571,10 +1571,11 @@ def save(base_name='base.ini',strategy_name='strategy.ini',base='Base',strategy=
     logging.basicConfig(filename="ctp_user_agent.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
  
     cfg = config.parse_base(base_name,base)
+    strategy_cfg = config.parse_strategy(strategy_name,strategy)
  
     ctrader = cfg.traders.values()[0]
     trader = TraderApi.CreateTraderApi(ctrader.name)
-    t_agent = SaveAgent(trader,ctrader,[],{})
+    t_agent = SaveAgent(trader,ctrader,[],strategy_cfg)
     
     myspi = TraderSpiDelegate(instruments=t_agent.instruments, 
                              broker_id=ctrader.broker_id,
@@ -1588,7 +1589,6 @@ def save(base_name='base.ini',strategy_name='strategy.ini',base='Base',strategy=
     trader.RegisterFront(ctrader.port)
     trader.Init()
     
-    strategy_cfg = config.parse_strategy(strategy_name,strategy)
     
     time.sleep(20)
     #print strategy_cfg.traces
@@ -1607,12 +1607,12 @@ def save2():
     return save(base_name='mybase.ini')
 
 
-def create_trader(name='base.ini',base='Base'):
+def create_trader(name='base.ini',base='Base',sname='strategy.ini'):
     logging.basicConfig(filename="ctp_trade.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
     
     trader = TraderApi.CreateTraderApi("trader")
     
-    strategy_cfg = config.parse_strategy()
+    strategy_cfg = config.parse_strategy(name=sname)
     cfg = config.parse_base(name,base)
 
     #模拟trader
