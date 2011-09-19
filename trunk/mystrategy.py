@@ -62,7 +62,7 @@ class dl_break_nhh(LONG_BREAK): #nhh的实现
     def check(self,data,ctick):
         opend = data.cur_day.vopen
         vlow = data.cur_day.vlow
-        logging.info(u'in check dl_break_nhh')
+        #logging.info(u'in check dl_break_nhh')
         if ctick.switch_min:
             self.pre_thigh = self.cur_thigh
             self.pre_highx = self.thigh.pop()
@@ -158,7 +158,7 @@ class dl_break_mll2(SHORT_BREAK): #mll2的实现
         ldmid = (data.d1[IHIGH][-1] + data.d1[IHIGH][-2])/2        
         vhigh = data.cur_day.vhigh
         opend = data.cur_day.vopen
-        logging.info(u'in check dl_break_mll2')
+        #logging.info(u'in check dl_break_mll2')
         if ctick.switch_min:
             self.pre_tlow = self.cur_tlow
             self.cur_tlow = min(data.slow[-self.length:]) + self.vbreak
@@ -170,7 +170,7 @@ class dl_break_mll2(SHORT_BREAK): #mll2的实现
                 slimit = vhigh - self.vrange2
             else:
                 slimit = self.cur_tlow
-            logging.info(u'iorder=%s,tlimit=%s,min1=%s,drange=%s,vrange=%s,vrange2=%s,vhigh=%s,pre_dlow=%s,slimit=%s,cur_low=%s' % (ctick.iorder,self.tlimit,ctick.min1,drange,self.vrange,self.vrange2,vhigh,self.pre_dlow,slimit,self.cur_tlow))
+            #logging.info(u'iorder=%s,tlimit=%s,min1=%s,drange=%s,vrange=%s,vrange2=%s,vhigh=%s,pre_dlow=%s,slimit=%s,cur_low=%s' % (ctick.iorder,self.tlimit,ctick.min1,drange,self.vrange,self.vrange2,vhigh,self.pre_dlow,slimit,self.cur_tlow))
             self.cur_tlow = min(slimit,self.cur_tlow,ldmid-60)
             #self.fsignal = (data.sclose[-1] < self.cur_tlow * 1.0015 and self.cur_tlow < ldmid - 60 and data.ma_13[-1] < data.ma_30[-1] and vhigh - self.cur_tlow < opend / 33)   #因为00归入老的一分钟,所以这里不能这么做
             logging.info(u'当前时间=%s,tlow=%s,pre_tlow=%s,slow[-1]=%s,stime[-1]=%s' % (ctick.time,self.cur_tlow,self.pre_tlow,data.slow[-1],data.stime[-1]))
