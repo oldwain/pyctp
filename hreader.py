@@ -256,7 +256,7 @@ def prepare_data(instruments,tday,path=DATA_PATH):
         data[inst] = tdata
         oc_index_d = PREPARER.pd(tdata.transaction[IORDER])
         tdata.d1 = compress(tdata.transaction,oc_index_d)
-        if len(tdata.d1[IDATE])>0:
+        if len(tdata.d1[IDATE])>0 and tdata.transaction[IORDER][-1]==270:
             tdata.cur_day = BaseObject(
                         vdate= tdata.d1[IDATE][-1],
                         vtime = tdata.stime[-1],    #最后的交易分钟
@@ -268,6 +268,23 @@ def prepare_data(instruments,tday,path=DATA_PATH):
                         vlowd = tdata.d1[ILOW][-1],
                         vholding = tdata.d1[IHOLDING][-1],
                         vvolume = tdata.d1[IVOL][-1],
+                    )
+        elif len(tdata.d1[IDATE])>0:
+            xtimes = tdata.transaction[IORDER]
+            poss = filter(lambda x:SPREPARER.ISEND_DAY(x[0]),zip(xtimes,range(len(xtimes))))
+            idlast = poss[-1][1] + 1
+            #print tdata.transaction[IORDER][idlast],tdata.transaction[IDATE][idlast],tdata.transaction[ITIME][idlast]
+            tdata.cur_day = BaseObject(
+                        vdate= tdata.sdate[idlast],
+                        vtime = tdata.stime[-1],    #最后的交易分钟
+                        vopen = tdata.sopen[idlast],
+                        vclose = tdata.sclose[-1],
+                        vhigh = max(tdata.shigh[idlast:]),
+                        vlow = min(tdata.slow[idlast:]),
+                        vhighd = max(tdata.shigh[idlast:]),
+                        vlowd = min(tdata.slow[idlast:]),
+                        vholding = tdata.sholding[-1],
+                        vvolume = tdata.svolume[-1],
                     )
         else:
             tdata.cur_day = BaseObject(
