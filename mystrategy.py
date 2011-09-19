@@ -62,6 +62,7 @@ class dl_break_nhh(LONG_BREAK): #nhh的实现
     def check(self,data,ctick):
         opend = data.cur_day.vopen
         vlow = data.cur_day.vlow
+        logging.info(u'in check dl_break_nhh')
         if ctick.switch_min:
             self.pre_thigh = self.cur_thigh
             self.pre_highx = self.thigh.pop()
@@ -157,6 +158,7 @@ class dl_break_mll2(SHORT_BREAK): #mll2的实现
         ldmid = (data.d1[IHIGH][-1] + data.d1[IHIGH][-2])/2        
         vhigh = data.cur_day.vhigh
         opend = data.cur_day.vopen
+        logging.info(u'in check dl_break_mll2')
         if ctick.switch_min:
             self.pre_tlow = self.cur_tlow
             self.cur_tlow = min(data.slow[-self.length:]) + self.vbreak
