@@ -214,7 +214,7 @@ ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
 ctp_mock.run_ticks(ticks,myagent)
 
 ##推进
-tday = 20110826
+tday = 20110920
 myagent.scur_day = tday
 ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
 ctp_mock.run_ticks(ticks,myagent)
