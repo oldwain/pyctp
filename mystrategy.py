@@ -80,11 +80,12 @@ class dl_break_nhh(LONG_BREAK): #nhh的实现
         #self.pre_high = data.cur_day.vhighd   
         self.pre_high = data.cur_day.vhigh #不用服务器上传过来的值，用ticks比较值
         signal = data.shigh[-1] <= self.pre_thigh and ctick.price > self.cur_thigh
-        fsignal = (self.cur_thigh - vlow < opend / 33 
-                and data.sclose[-3] > self.cur_thigh * 0.9966
-                and data.xatr1[-1] < 2500
-                and ctick.min1 > 1035
+        fsignal = (
+                ctick.min1 > 1035
                 and ctick.min1 < 1436
+                #and self.cur_thigh - vlow < opend / 33 
+                #and data.sclose[-3] > self.cur_thigh * 0.9966
+                and data.xatr1[-1] < 2500
             )
         my_signal = signal and fsignal
         if my_signal and ctick.min1 != self.last_signal:# and ctick.min1<1300:
@@ -153,6 +154,8 @@ class dl_break_mll2(SHORT_BREAK): #mll2的实现
         self.pre_tlow = 0
         self.cur_tlow = 0
         self.last_signal = 0
+        self.high_13 = 0
+        self.high_30 = 0
 
     def check(self,data,ctick):
         ldmid = (data.d1[IHIGH][-1] + data.d1[IHIGH][-2])/2        
@@ -162,6 +165,9 @@ class dl_break_mll2(SHORT_BREAK): #mll2的实现
         if ctick.switch_min:
             self.pre_tlow = self.cur_tlow
             self.cur_tlow = min(data.slow[-self.length:]) + self.vbreak
+            self.high_13 = max(data.shigh[-13:])
+            self.high_30 = max(data.shigh[-30:])
+                    
             #drange = vhigh - data.cur_day.vlow  #这里有点不同，用到的幅度不是上一分钟的，也用到本分钟
             drange = vhigh - self.pre_dlow
             if ctick.min1 < self.tlimit and drange < self.vrange:
@@ -178,14 +184,16 @@ class dl_break_mll2(SHORT_BREAK): #mll2的实现
         #self.pre_dlow = data.cur_day.vlowd
         self.pre_dlow = data.cur_day.vlow   #不用服务器上传过来的值，用ticks比较值
         signal = data.slow[-1] >= self.pre_tlow and ctick.price < self.cur_tlow
-        fsignal = (data.sclose[-1] < self.cur_tlow * 1.0015 
+        fsignal = (
+                ctick.min1 > 944 
+                and ctick.min1 < 1445
+                #and data.sclose[-1] < self.cur_tlow * 1.0015 
                 and self.cur_tlow < ldmid - 60 
                 and data.ma_13[-1] < data.ma_30[-1] 
-                and vhigh - self.cur_tlow < opend / 33 
+                #and vhigh - self.cur_tlow < opend / 33 
                 and data.xatr1[-1] < 2000
                 and data.xatr30[-1] < 10000
-                and ctick.min1 > 944 
-                and ctick.min1 < 1445
+                and self.high_13 < self.high_30
             )
         
         my_signal = signal and fsignal
