@@ -72,7 +72,7 @@ class Order(object):
     def on_cancel(self):    #已经撤单
         self.cancelled = True
         self.volume = self.opened_volume    #不会再有成交回报
-        logging.debug('O_OC:on cancel')
+        logging.info('O_OC:on cancel,self.volume=%s' % (self.volume,))
         self.position.re_calc()
 
     def is_closed(self): #是否已经完全平仓
@@ -132,7 +132,7 @@ class Position(object):
         #本次可开仓数 = 策略单次开仓数 和 剩余开仓总数 的小者
         #print 'self.strategy.open_volume:%s' % (self.strategy.open_volume,)
         can_open = self.strategy.open_volume if self.strategy.open_volume <=  remained else remained
-        logging.info(u'P_COV_2:计算头寸可开仓数完成,可开数=%s,%s:Pos=%s,策略允许数=%s,资金允许数=%s' % (can_open,self.instrument.name,str(self),self.strategy.open_volume,remained))
+        logging.info(u'P_COV_2:计算头寸可开仓数完成,可开数=%s,%s:Pos=%s,策略单开数=%s,总体可开数=%s' % (can_open,self.instrument.name,str(self),self.strategy.open_volume,remained))
         return can_open
 
     def re_calc(self): #
