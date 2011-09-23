@@ -1397,12 +1397,14 @@ class Agent(AbsAgent):
             暂时只处理撤单的回报. 
         '''
         #print str(sorder)
+        logging.info(u'成交/撤单回报:%s' % (str(sorder,)))
         if sorder.OrderStatus == utype.THOST_FTDC_OST_Canceled or sorder.OrderStatus == utype.THOST_FTDC_OST_PartTradedNotQueueing:   #完整撤单或部成部撤
             ##查询可用资金
             self.put_command(self.get_tick()+1,self.fetch_trading_account)
             ##处理相关Order
             myorder = self.ref2order[int(sorder.OrderRef)]
             if myorder.action_type == XOPEN:    #开仓指令cancel时需要处理，平仓指令cancel时不需要处理
+                logging.info(u'撤销开仓单')
                 myorder.on_cancel()
 
     def err_order_insert(self,order_ref,instrument_id,error_id,error_msg):
