@@ -366,11 +366,12 @@ class TraderSpiDelegate(TraderSpi):
         r=self.api.ReqUserLogin(req,self.agent.inc_request_id())
 
     def OnRspUserLogin(self, pRspUserLogin, pRspInfo, nRequestID, bIsLast):
-        self.logger.info('TD:trader login')
-        self.logger.debug("TD:loggin %s" % str(pRspInfo))
+        self.logger.info(u'TD:trader login')
+        self.logger.debug(u"TD:loggin %s" % str(pRspInfo))
         if not self.isRspSuccess(pRspInfo):
             self.logger.warning(u'TD:trader login failed, errMsg=%s' %(pRspInfo.ErrorMsg,))
             return
+        self.logger.info(u'TD:trader loging success')
         self.agent.login_success(pRspUserLogin.FrontID,pRspUserLogin.SessionID,pRspUserLogin.MaxOrderRef)
         #self.settlementInfoConfirm()
         self.agent.set_trading_day(self.api.GetTradingDay())
