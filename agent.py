@@ -917,7 +917,7 @@ class Agent(AbsAgent):
         #print u'in my lock, close长度:%s,ma_5长度:%s\n' %(len(self.instruments[ctick.instrument].data.sclose),len(self.instruments[ctick.instrument].data.ma_5))
         if self.trader != None and not self.trader.myspi.is_logged:
             logging.info(u'trader not logging,try login.......')
-            self.trader.login()
+            self.trader.myspi.login()
         inst = ctick.instrument
         if not self.prepare_tick(ctick):    #非法ticks数据
             #print 'invalid ticks'
