@@ -346,9 +346,14 @@ class TraderSpiDelegate(TraderSpi):
         self.passwd = passwd
         self.agent = agent
         self.agent.set_spi(self)
+        self.is_logged = False
  
     def isRspSuccess(self,RspInfo):
         return RspInfo == None or RspInfo.ErrorID == 0
+
+    def login(self):
+        self.logger.info(u'try login...')
+        self.user_login(self.broker_id, self.investor_id, self.passwd)
 
     ##交易初始化
     def OnFrontConnected(self):
@@ -356,7 +361,7 @@ class TraderSpiDelegate(TraderSpi):
             当客户端与交易后台建立起通信连接时（还未登录前），该方法被调用。
         '''
         self.logger.info(u'TD:trader front connected')
-        self.user_login(self.broker_id, self.investor_id, self.passwd)
+        self.login()
 
     def OnFrontDisconnected(self, nReason):
         self.logger.info(u'TD:trader front disconnected,reason=%s' % (nReason,))
@@ -370,8 +375,10 @@ class TraderSpiDelegate(TraderSpi):
         self.logger.debug(u"TD:loggin %s" % str(pRspInfo))
         if not self.isRspSuccess(pRspInfo):
             self.logger.warning(u'TD:trader login failed, errMsg=%s' %(pRspInfo.ErrorMsg,))
+            self.is_logged = False
             return
-        self.logger.info(u'TD:trader loging success')
+        self.is_logged = True
+        self.logger.info(u'TD:trader login success')
         self.agent.login_success(pRspUserLogin.FrontID,pRspUserLogin.SessionID,pRspUserLogin.MaxOrderRef)
         #self.settlementInfoConfirm()
         self.agent.set_trading_day(self.api.GetTradingDay())
@@ -381,6 +388,7 @@ class TraderSpiDelegate(TraderSpi):
     def OnRspUserLogout(self, pUserLogout, pRspInfo, nRequestID, bIsLast):
         '''登出请求响应'''
         self.logger.info(u'TD:trader logout')
+        self.is_logged = False
 
     def resp_common(self,rsp_info,bIsLast,name='默认'):
         #self.logger.debug("resp: %s" % str(rsp_info))
@@ -907,6 +915,9 @@ class Agent(AbsAgent):
     ##交易处理
     def RtnTick(self,ctick):#行情处理主循环
         #print u'in my lock, close长度:%s,ma_5长度:%s\n' %(len(self.instruments[ctick.instrument].data.sclose),len(self.instruments[ctick.instrument].data.ma_5))
+        if self.trader != None and not self.trader.myspi.is_logged:
+            logging.info(u'trader not logging,try login.......')
+            self.trader.login()
         inst = ctick.instrument
         if not self.prepare_tick(ctick):    #非法ticks数据
             #print 'invalid ticks'
@@ -1587,6 +1598,7 @@ def save(base_name='base.ini',strategy_name='strategy.ini',base='Base',strategy=
                              agent = t_agent,
                        )
     trader.RegisterSpi(myspi)
+    trader.myspi = myspi
     trader.SubscribePublicTopic(THOST_TERT_QUICK)
     trader.SubscribePrivateTopic(THOST_TERT_QUICK)
     trader.RegisterFront(ctrader.port)
@@ -1631,6 +1643,7 @@ def create_trader(name='base.ini',base='Base',sname='strategy.ini'):
                              agent = myagent,
                        )
     trader.RegisterSpi(myspi)
+    trader.myspi = myspi
     trader.SubscribePublicTopic(THOST_TERT_QUICK)
     trader.SubscribePrivateTopic(THOST_TERT_QUICK)
     trader.RegisterFront(cuser.port)
@@ -1665,6 +1678,7 @@ def trade_test_main(name='base.ini',base='Base'):
                              agent = my_agent,
                        )
     trader.RegisterSpi(myspi)
+    trader.myspi = myspi
     trader.SubscribePublicTopic(THOST_TERT_QUICK)
     trader.SubscribePrivateTopic(THOST_TERT_QUICK)
     trader.RegisterFront(cuser.port)
