@@ -160,11 +160,14 @@ class dl_break_mll2(SHORT_BREAK): #mll2的实现
     def check(self,data,ctick):
         ldmid = (data.d1[IHIGH][-1] + data.d1[IHIGH][-2])/2        
         vhigh = data.cur_day.vhigh
+        vlow = data.cur_day.vlow
         opend = data.cur_day.vopen
         #logging.info(u'in check dl_break_mll2')
         if ctick.switch_min:
             self.pre_tlow = self.cur_tlow
             self.cur_tlow = min(data.slow[-self.length:]) + self.vbreak
+            if ctick.iorder < self.length:   #如果当日行情数量还不足够，则用当日的最低点为低点，不涉及昨日
+                self.cur_tlow = vlow
             self.high_13 = max(data.shigh[-13:])
             self.high_30 = max(data.shigh[-30:])
                     
