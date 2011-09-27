@@ -32,6 +32,7 @@ class TraderMock(object):
     def __init__(self,myagent):
         self.myagent = myagent
         self.available = 1000000    #初始100W
+        self.myspi = BaseObject(is_logged=True)
 
     def ReqOrderInsert(self, order, request_id):
         '''报单录入请求, 需要调用成交函数'''
