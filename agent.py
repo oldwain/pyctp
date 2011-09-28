@@ -914,6 +914,7 @@ class Agent(AbsAgent):
 
     ##交易处理
     def RtnTick(self,ctick):#行情处理主循环
+        logging.info(u'AR_A:cur_tick=%s' % (self.tick,))
         #print u'in my lock, close长度:%s,ma_5长度:%s\n' %(len(self.instruments[ctick.instrument].data.sclose),len(self.instruments[ctick.instrument].data.ma_5))
         if self.trader != None and not self.trader.myspi.is_logged:
             logging.info(u'trader not logging,try login.......')
@@ -952,6 +953,7 @@ class Agent(AbsAgent):
             #print ctick.date,ctick.time,dinst.data.cur_min.vdate,dinst.data.cur_min.vtime
             logging.info(u'过滤:time=%s,ctick.iorder=%s,ctick.date=%s,ddc.viorder=%s,ddc.vdate=%s' % (ctick.time,ctick.iorder,ctick.date,dinst.data.cur_min.viorder,dinst.data.cur_min.vdate))
             return False
+        #logging.info(u'cur_tick:%s' % (ctick.tick,))
         if(self.prepare_base(dinst,ctick)):  #如果切分分钟则返回>0
             for func in self.data_funcs:    #动态计算
                 func.func1(dinst.data)
@@ -1239,13 +1241,16 @@ class Agent(AbsAgent):
                 #............ 加锁完毕. 这样，同一instrument本时刻再有其它策略的开仓时，其calc_remained_volume能返回合适值
                 logging.info(u'A_MC:当前tick=%s,下单有效时长(超过该时长未成交则撤单)=%s' % (self.get_tick(),order.position.strategy.opener.valid_length,))
                 self.put_command(self.get_tick()+order.position.strategy.opener.valid_length,fcustom(self.cancel_command,command=command))
+                logging.info(u'A_MC_B:设置开仓撤单完成,cur_tick=%s,触发点=%s' % (self.get_tick(),self.get_tick()+order.position.strategy.opener.valid_length))
                 self.open_position(command)
             else:#平仓, Y跳后不论是否成功均撤单, 撤单应该比开仓更快，避免追不上
                 #print u'平仓'
                 #self.ref2order[command.order_ref] = order.source_order
+                logging.info(u'A_MC_C:平仓处理')
                 self.ref2order[command.order_ref] = order   #2011-8-6
                 self.put_command(self.get_tick()+order.source_order.stoper.valid_length,fcustom(self.cancel_command,command=command))
                 self.put_command(self.get_tick()+order.source_order.stoper.valid_length,lambda : order.source_order.release_close_lock())
+                logging.info(u'A_MC_D:设置平仓撤单完成,cur_tick=%s,触发点=%s' % (self.get_tick(),self.get_tick()+order.source_order.stoper.valid_length))
                 self.close_position(command)
                 logging.info(u'发出平仓指令，cur_tick=%s,释放锁的时间是=%s' % (self.get_tick(),self.get_tick()+order.source_order.stoper.valid_length))
 
@@ -1411,6 +1416,7 @@ class Agent(AbsAgent):
         #print str(sorder)
         logging.info(u'成交/撤单回报:%s' % (str(sorder,)))
         if sorder.OrderStatus == utype.THOST_FTDC_OST_Canceled or sorder.OrderStatus == utype.THOST_FTDC_OST_PartTradedNotQueueing:   #完整撤单或部成部撤
+            logging.info(u'撤单, 撤销开/平仓单')
             ##查询可用资金
             self.put_command(self.get_tick()+1,self.fetch_trading_account)
             ##处理相关Order
