@@ -54,7 +54,7 @@ class TraderMock(object):
             self.available -= order.LimitPrice * 300 * 0.17
         else:
             self.available += order.LimitPrice * 300 * 0.17
-        #self.myagent.rtn_trade(trade)
+        self.myagent.rtn_trade(trade)
 
     def ReqOrderAction(self, corder, request_id):
         '''撤单请求'''
@@ -197,8 +197,8 @@ import hreader
 
 ctp_mock.log_config()
 
-preday = 20110922
-tday = 20110923
+preday = 20110927
+tday = 20110928
 instrument = 'IF1110'
 #preday = 20110913
 #tday = 20110914
