@@ -272,7 +272,6 @@ class MdSpiDelegate(MdSpi):
             #self.logger.debug(u'收到行情:%s,time=%s:%s' %(depth_market_data.InstrumentID,depth_market_data.UpdateTime,depth_market_data.UpdateMillisec))
             dp = depth_market_data
             self.logger.debug(u'MD:收到行情，inst=%s,time=%s，volume=%s,last_volume=%s' % (dp.InstrumentID,dp.UpdateTime,dp.Volume,self.last_map[dp.InstrumentID]))
-            self.agent.inc_tick()
             if dp.Volume <= self.last_map[dp.InstrumentID]:
                 self.logger.debug(u'MD:行情无变化，inst=%s,time=%s，volume=%s,last_volume=%s' % (dp.InstrumentID,dp.UpdateTime,dp.Volume,self.last_map[dp.InstrumentID]))
                 return  #行情未变化
@@ -281,6 +280,7 @@ class MdSpiDelegate(MdSpi):
 
             #self.logger.debug(u'after modify instrument=%s,lastvolume:%s,curVolume:%s' % (dp.InstrumentID,self.last_map[dp.InstrumentID],dp.Volume))
             #self.logger.debug(u'before loop')
+            self.agent.inc_tick()
             ctick = self.market_data2tick(depth_market_data)
             self.agent.RtnTick(ctick)
         finally:
@@ -1249,10 +1249,10 @@ class Agent(AbsAgent):
                 logging.info(u'A_MC_C:平仓处理')
                 self.ref2order[command.order_ref] = order   #2011-8-6
                 self.put_command(self.get_tick()+order.source_order.stoper.valid_length,fcustom(self.cancel_command,command=command))
-                self.put_command(self.get_tick()+order.source_order.stoper.valid_length,lambda : order.source_order.release_close_lock())
+                self.put_command(self.get_tick()+order.source_order.stoper.valid_length+1,lambda : order.source_order.release_close_lock())
                 logging.info(u'A_MC_D:设置平仓撤单完成,cur_tick=%s,触发点=%s' % (self.get_tick(),self.get_tick()+order.source_order.stoper.valid_length))
                 self.close_position(command)
-                logging.info(u'发出平仓指令，cur_tick=%s,释放锁的时间是=%s' % (self.get_tick(),self.get_tick()+order.source_order.stoper.valid_length))
+                logging.info(u'发出平仓指令，cur_tick=%s,释放锁的时间是=%s' % (self.get_tick(),self.get_tick()+order.source_order.stoper.valid_length+1))
 
     def open_position(self,order):
         ''' 
