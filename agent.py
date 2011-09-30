@@ -914,7 +914,7 @@ class Agent(AbsAgent):
 
     ##交易处理
     def RtnTick(self,ctick):#行情处理主循环
-        logging.info(u'AR_A:cur_tick=%s' % (self.tick,))
+        #logging.info(u'AR_A:cur_tick=%s' % (self.tick,))
         #print u'in my lock, close长度:%s,ma_5长度:%s\n' %(len(self.instruments[ctick.instrument].data.sclose),len(self.instruments[ctick.instrument].data.ma_5))
         if self.trader != None and not self.trader.myspi.is_logged:
             logging.info(u'trader not logging,try login.......')

@@ -167,9 +167,10 @@ class NULLAgent(object):
     def RtnTick(self,ctick):#行情处理主循环
         pass
 
-def create_agent_with_mocktrader(instrument,tday):
+def create_agent_with_mocktrader(instrument,tday,sname='strategy_trader.ini'):
     trader = TraderMock(None)
-    strategy_cfg = config.parse_strategy()
+    print sname
+    strategy_cfg = config.parse_strategy(name=sname)
 
     ##这里没有考虑现场恢复，state中需注明当日
     cuser = BaseObject(broker_id='test',port=1111,investor_id='test',passwd='test')
@@ -197,8 +198,8 @@ import hreader
 
 ctp_mock.log_config()
 
-preday = 20110927
-tday = 20110928
+preday = 20110920
+tday = 20110921
 instrument = 'IF1110'
 #preday = 20110913
 #tday = 20110914
