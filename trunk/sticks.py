@@ -501,7 +501,8 @@ class b123_opener(TICK_LONG_OPENER):
 29
 >>> for trade in trades: print trade.profit,trade.open_time,trade.open_base_price,trade.open_price,trade.close_time%1000000,trade.close_price
     
-    76.2点/109次
+    9.10合约 76.2点/109次
+    8合约: -37
     '''
     def __init__(self,ulen=120,dlen=120,dfilter=16):
         '''
@@ -557,7 +558,8 @@ class s123_opener(TICK_SHORT_OPENER):
 >>> len(trades)
 29
 >>> for trade in trades: print trade.profit,trade.open_time,trade.open_base_price,trade.open_price,trade.close_time%1000000,trade.close_price
-    125.6点/205次
+    9-10合约 125.6点/205次
+    8合约: -70
     '''
     def __init__(self,ulen=120,dlen=120):
         self.it = 0  #计数
@@ -609,7 +611,12 @@ class s123b_opener(TICK_SHORT_OPENER):
 >>> len(trades)
 29
 >>> for trade in trades: print trade.profit,trade.open_time,trade.open_base_price,trade.open_price,trade.close_time%1000000,trade.close_price
-
+    
+    9-10合约: 191 /729 /29个交易日
+    8合约: 69 /503/26个交易日
+    只有这个在3个月内都是稳定的. 但是交易次数太多
+    而且总体来说,如果没有最大的1-3次收益,那么总体就是亏的
+    应当说没有找到合适的可用方法.
     '''
     def __init__(self,ulen=20,dlen=20):
         self.it = 0  #计数
@@ -835,6 +842,15 @@ def prepare_data():
         tickss.append(cur_ticks)
     for idate in dates:
         cur_ticks = hreader.read_ticks('IF1110',idate)
+        prepare_index(cur_ticks)
+        tickss.append(cur_ticks)
+    return tickss
+
+def prepare_data_201108():
+    dates = [20110714,20110715,20110718,20110719,20110720,20110721,20110722,20110725,20110726,20110727,20110728,20110729,20110801,20110802,20110803,20110804,20110805,20110808,20110809,20110810,20110811,20110812,20110815,20110816,20110817,20110818]
+    tickss = []
+    for idate in dates:
+        cur_ticks = hreader.read_ticks('IF1108',idate)
         prepare_index(cur_ticks)
         tickss.append(cur_ticks)
     return tickss
