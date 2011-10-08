@@ -325,7 +325,7 @@ class lbreak_opener(TICK_LONG_OPENER):
         self.poped = 0
 
     def tick(self,tick):
-        TICK_LONG_OPENER.tick(self,tick)
+        super(lbreak_opener,self).tick(tick) 
         self.buffer.append(tick.price)
         self.poped = self.buffer[0]
         del self.buffer[0]
@@ -349,7 +349,7 @@ class sbreak_opener(TICK_SHORT_OPENER):
         self.poped = 0
 
     def tick(self,tick):
-        TICK_SHORT_OPENER.tick(self,tick)
+        super(sbreak_opener,self).tick(tick) 
         self.buffer.append(tick.price)
         self.poped = self.buffer[0]
         del self.buffer[0]
@@ -386,7 +386,7 @@ class lreverse_opener(TICK_LONG_OPENER):
             self.direction = TUP if tick.price > vlast else TDOWN
         else: #tick.price == vlast
             pass
-        TICK_LONG_OPENER.tick(self,tick)
+        super(lreverse_opener,self).tick(tick) 
         self.vmax = self.bbuffer.vmax()
         self.vpre = self.bbuffer.exchange(tick.price)
 
@@ -410,7 +410,7 @@ class lpeak_opener(TICK_LONG_OPENER):
         self.wbuffer = BUFFER(120)
 
     def tick(self,tick):
-        TICK_LONG_OPENER.tick(self,tick)
+        super(lpeak_opener,self).tick(tick) 
         self.ubuffer.exchange(tick.price)
         self.dbuffer.exchange(tick.price)
         self.wbuffer.exchange(tick.price)
@@ -438,7 +438,7 @@ class speak_opener(TICK_SHORT_OPENER):
     '''
         前低突破
     '''
-    def __init__(self,ulen=30,dlen=10):
+    def __init__(self,ulen=200,dlen=200):
         self.ulen = ulen
         self.dlen = dlen
         self.upeaks = []
@@ -452,7 +452,7 @@ class speak_opener(TICK_SHORT_OPENER):
         self.pre_volume = 0
 
     def tick(self,tick):
-        TICK_SHORT_OPENER.tick(self,tick)
+        super(speak_opener,self).tick(tick)
         self.ubuffer.exchange(tick.price)
         self.dbuffer.exchange(tick.price)
         self.wbuffer.exchange(tick.price)
@@ -475,18 +475,19 @@ class speak_opener(TICK_SHORT_OPENER):
     def check(self,cur_trade):
         if self.cur_tick.min1 < 930:
             return False
-        if cur_trade.env.psum < -100:#停摆
+        if cur_trade.env.psum < -120:#停摆
             return False
         #if self.cur_tick.high - self.cur_tick.low > 400 or self.cur_tick.high-self.cur_tick.low<100:
         #    return False
-        mhigh = self.wbuffer.vmax()
-        mlow = self.wbuffer.vmin()
+        #mhigh = self.wbuffer.vmax()
+        #mlow = self.wbuffer.vmin()
         #if mhigh - mlow > self.cur_tick.dopen/750 or self.wbuffer.data[-10] - self.cur_tick.price > 20:
-        if self.wbuffer.data[-20] - self.cur_tick.price > self.cur_tick.dopen/1000 or mhigh-mlow > self.cur_tick.dopen/300:
-            return False
+        #if self.wbuffer.data[-20] - self.cur_tick.price > self.cur_tick.dopen/1000:# or mhigh-mlow > self.cur_tick.dopen/300:
+        #    return False
+        
         #print 'in check,time=%s' % (self.cur_tick.time,)
         #if self.dpeaks and self.cur_tick.price < self.dpeaks[-1]:
-        if len(self.dpeaks)>=2 and self.cur_tick.price <= self.dpeaks[-1]:# and self.sbuffer.vsum() > self.lbuffer.vsum():
+        if self.cur_tick.price > self.cur_tick.dopen and len(self.upeaks)>=2 and self.cur_tick.price >= self.upeaks[-1] and self.dpeaks[-2] > self.dpeaks[-1]:
             #print self.sbuffer.vsum() , self.lbuffer.vsum()
             return True
         return False
@@ -521,7 +522,7 @@ class b123_opener(TICK_LONG_OPENER):
         self.wbuffer = BUFFER(200)
 
     def tick(self,tick):
-        TICK_LONG_OPENER.tick(self,tick)
+        super(b123_opener,self).tick(tick) 
         self.ubuffer.exchange(tick.price)
         self.dbuffer.exchange(tick.price)        
         self.wbuffer.exchange(tick.price)
@@ -574,7 +575,7 @@ class s123_opener(TICK_SHORT_OPENER):
         self.wbuffer = BUFFER(120)
 
     def tick(self,tick):
-        TICK_SHORT_OPENER.tick(self,tick)
+        super(s123_opener,self).tick(tick) 
         self.ubuffer.exchange(tick.price)
         self.dbuffer.exchange(tick.price)        
         self.wbuffer.exchange(tick.price)
@@ -631,7 +632,7 @@ class s123b_opener(TICK_SHORT_OPENER):
         self.wbuffer = BUFFER(120)
 
     def tick(self,tick):
-        TICK_SHORT_OPENER.tick(self,tick)
+        super(s123b_opener,self).tick(tick) 
         self.ubuffer.exchange(tick.price)
         self.dbuffer.exchange(tick.price)        
         self.wbuffer.exchange(tick.price)
@@ -659,20 +660,51 @@ class s123b_opener(TICK_SHORT_OPENER):
             return True
         return False
 
-class ma_opener(TICK_LONG_OPENER):
-    def __init__(self):
+class lma_opener(TICK_LONG_OPENER):
+    def __init__(self,length=120):
+        self.length = length
+        self.wbuffer = BUFFER(length+1)
         self.spre = False
 
+    def tick(self,tick):
+        super(lma_opener,self).tick(tick)
+        self.wbuffer.exchange(tick.price)
+
     def check(self,cur_trade):
-        if self.spre == False and self.cur_tick.price > self.cur_tick.ma5 and self.cur_tick.sma5<0:
+        mcur = sum(self.wbuffer.data[:-5])/(self.length-4)
+        #mhigh = max(self.wbuffer.data[:-4])
+        #mlow = min(self.wbuffer.data[:-4])
+        umcur = mcur + self.cur_tick.dopen/300
+        #umcur = mcur + (mhigh-mlow)
+        if self.spre == False and self.cur_tick.price > umcur:
             self.spre = True
             return True
-        elif self.cur_tick.price > self.cur_tick.ma5:
-            self.spre = True
         else:
             self.spre = False
         return False
 
+class dma_opener(TICK_SHORT_OPENER):
+    def __init__(self,length=200):
+        self.length = length
+        self.wbuffer = BUFFER(length+1)
+        self.spre = False
+
+    def tick(self,tick):
+        super(dma_opener,self).tick(tick)
+        self.wbuffer.exchange(tick.price)
+
+    def check(self,cur_trade):
+        mcur = sum(self.wbuffer.data[:-5])/(self.length-4)
+        #mhigh = max(self.wbuffer.data[:-4])
+        #mlow = min(self.wbuffer.data[:-4])
+        umcur = mcur + self.cur_tick.dopen/300
+        #umcur = mcur + (mhigh-mlow)
+        if self.spre == False and self.cur_tick.price > umcur:
+            self.spre = True
+            return True
+        else:
+            self.spre = False
+        return False
 
 class long_channel_opener(TICK_LONG_OPENER):
     def __init__(self,long_len=200,short_len=30):
