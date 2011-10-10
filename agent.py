@@ -644,10 +644,11 @@ class c_instrument(object):
         #   tdata.cur_min是当前分钟的行情，包括开盘,最高,最低,当前价格,持仓,累计成交量
         #   tdata.cur_day是当日的行情，包括开盘,最高,最低,当前价格,持仓,累计成交量, 其中最高/最低有两类，一者是tick的当前价集合得到的，一者是tick中的最高/最低价得到的
         self.t2order = t2order_if if hreader.is_if(self.name) else t2order_com
-        if int(time.strftime('%H%M%S')) > 170000:   #模拟
-            self.t2order = t2order_mock
-        elif int(time.strftime('%H%M%S')) > 151500:   #模拟
-            self.t2order = t2order_mock2
+        ##模拟的在外面解决
+        #if int(time.strftime('%H%M%S')) > 170000:   #模拟
+        #    self.t2order = t2order_mock
+        #elif int(time.strftime('%H%M%S')) > 151500:   #模拟
+        #    self.t2order = t2order_mock2
 
         self.data = BaseObject()
         self.begin_flag = False #save标志，默认第一个不保存, 因为第一次切换的上一个是历史数据
