@@ -198,8 +198,8 @@ import hreader
 
 ctp_mock.log_config()
 
-preday = 20110929
-tday = 20110930
+preday = 20110930
+tday = 20111010
 instrument = 'IF1110'
 #preday = 20110913
 #tday = 20110914

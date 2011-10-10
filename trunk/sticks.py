@@ -258,7 +258,7 @@ def make_trades(opener,closer,ticks,base_unit,fee):
                     xprice = jt.price
                     break
             if xprice == 0:#未找到
-                print u'不能成交,time=%s,cur_price=%s,target_price=%s,sprice=%s' % (tick.time,tick.price,target_price,[(t.price,t.time) for t in ticks[i+1:i+opener.open_length+1]])
+                #print u'不能成交,time=%s,cur_price=%s,target_price=%s,sprice=%s' % (tick.time,tick.price,target_price,[(t.price,t.time) for t in ticks[i+1:i+opener.open_length+1]])
                 continue
             cur_trade.xtype = opener.xtype
             cur_trade.open_base_price = -tick.price if opener.xtype == base.LONG else tick.price
@@ -706,6 +706,80 @@ class dma_opener(TICK_SHORT_OPENER):
             self.spre = False
         return False
 
+class lvama_opener(TICK_LONG_OPENER):
+    def __init__(self,capacity=200,slen=3,llen=120):
+        assert(slen < llen)
+        self.capacity = capacity
+        self.slen = slen
+        self.llen = llen
+        self.cbuffer = BUFFER(llen+1)   #收价序列
+        self.wbuffer = BUFFER(llen+1)   #波动序列
+        self.tbuffer = BUFFER(llen+1)   #时间序列
+        self.sma = []
+        self.lma = []
+        self.chigh = 0
+        self.clow = 9999999
+        self.vpre = 0
+        self.check_it = False
+
+    def tick(self,tick):
+        super(lvama_opener,self).tick(tick)
+        if tick.price > self.chigh:
+            self.chigh = tick.price
+        if tick.price < self.clow:
+            self.clow = tick.price
+        if tick.dvolume - self.vpre > self.capacity:#假设一个ticks不会有超过capacity的交易量
+            self.vpre = tick.dvolume - tick.dvolume%self.capacity
+            self.check_it = True
+            self.cbuffer.exchange(tick.price)
+            self.wbuffer.exchange(self.chigh-self.clow)
+            self.tbuffer.exchange(tick.time)
+            self.chigh = 0
+            self.clow = 9999999
+            if len(self.cbuffer.data) >= self.slen:
+                self.sma.append(sum(self.cbuffer.data[-self.slen:])/self.slen)
+            if len(self.cbuffer.data) >= self.llen:
+                self.lma.append(sum(self.cbuffer.data[-self.llen:])/self.llen)
+        else:
+            self.check_it = False
+        if len(self.lma) < 2:
+            self.check_it = False
+
+    def check(self,cur_trade):
+        if self.check_it == True and (self.sma[-2]<=self.lma[-2] 
+                    and self.sma[-1]>self.lma[-1] 
+                    and self.sma[-1]>self.sma[-2] 
+                    and self.lma[-1]>=self.lma[-2]
+                ):
+            return True
+        return False
+
+
+class svama_opener(TICK_SHORT_OPENER):
+    def __init__(self,length=200):
+        self.length = length
+        self.wbuffer = BUFFER(length+1)
+        self.spre = False
+
+    def tick(self,tick):
+        super(dma_opener,self).tick(tick)
+        self.wbuffer.exchange(tick.price)
+
+    def check(self,cur_trade):
+        mcur = sum(self.wbuffer.data[:-5])/(self.length-4)
+        #mhigh = max(self.wbuffer.data[:-4])
+        #mlow = min(self.wbuffer.data[:-4])
+        umcur = mcur + self.cur_tick.dopen/300
+        #umcur = mcur + (mhigh-mlow)
+        if self.spre == False and self.cur_tick.price > umcur:
+            self.spre = True
+            return True
+        else:
+            self.spre = False
+        return False
+
+
+
 class long_channel_opener(TICK_LONG_OPENER):
     def __init__(self,long_len=200,short_len=30):
         self.buffer = [999999] * long_len
@@ -863,15 +937,18 @@ def test2m():
     #for result in results:print result.idate,result.isum,result.ilen
     return results
 
-
-def prepare_data():
-    dates = [20110914,20110915,20110916,20110919,20110920,20110921,20110922,20110923,20110926,20110927,20110928,20110929,20110930]
+def prepare_data_201109():
     dates2 = [20110817,20110818,20110819,20110822,20110823,20110824,20110825,20110826,20110829,20110830,20110831,20110901,20110902,20110909,20110913,20110914]
     tickss = []
     for idate in dates2:
         cur_ticks = hreader.read_ticks('IF1109',idate)
         prepare_index(cur_ticks)
         tickss.append(cur_ticks)
+    return tickss
+
+def prepare_data_201110():
+    dates = [20110914,20110915,20110916,20110919,20110920,20110921,20110922,20110923,20110926,20110927,20110928,20110929,20110930]
+    tickss = []
     for idate in dates:
         cur_ticks = hreader.read_ticks('IF1110',idate)
         prepare_index(cur_ticks)
@@ -886,7 +963,6 @@ def prepare_data_201108():
         prepare_index(cur_ticks)
         tickss.append(cur_ticks)
     return tickss
-
 
 def test2(tickss,opener,closer):
     '''
@@ -911,4 +987,40 @@ def test2(tickss,opener,closer):
     #for result in results:print result.instrument,result.idate,result.isum,result.ilen
     #sum([result.isum for result in results])
     return results
+
+def testv1(capacity=200):
+    ticks = hreader.read_ticks('IF1110',20110927)    #不加载当日数据
+    results = []
+    for llen in range(5,500,2):
+        trades=make_trades(lvama_opener(llen=llen,capacity=capacity),long_trailing_stop(),ticks,2,4)
+        results.append((llen,sum([trade.profit for trade in trades]),len(trades)))
+        if results[-1][1]>0:
+            print results[-1]
+    return results
+        
+def testv(tickss):
+    #tickss = prepare_data_201107()
+    sresults = []
+    for capacity in (100,200,300,400,500,600,700,800,900,1000,1200,1500,2000):
+        for llen in range(5,600,2):#:
+            #print 'in capacity:%s,llen:%s' % (capacity,llen)
+            results = []
+            for ticks in tickss:
+                trades=make_trades(lvama_opener(llen=llen,capacity=capacity),long_trailing_stop(),ticks,2,4)
+                result = base.BaseObject(
+                            instrument = ticks[0].instrument,
+                            idate = ticks[0].time/1000000,
+                            isum = sum([trade.profit for trade in trades]),
+                            #isum2 = sum([trade.profit for trade in trades[:50]]),                            
+                            ilen = len(trades),
+                        )
+                results.append(result)
+            rsum = sum([result.isum for result in results])
+            rlen = sum([result.ilen for result in results])
+            sresults.append((capacity,llen,rsum,rlen))
+            print 'calced capacity=%s,llen=%s,rlen=%s,rsum=%s' % (capacity,llen,rlen,rsum)
+            if rlen < 10:
+                print u'break'
+                break
+    return sresults
 
