@@ -550,6 +550,64 @@ class b123_opener(TICK_LONG_OPENER):
         return False
 
 
+class hb123_opener(TICK_LONG_OPENER):
+    '''
+        前高突破
+>>> trades = sticks.make_trades(sticks.sb123_opener(),sticks.long_trailing_stop(),tickss[-1],2,4)
+>>> sum([trade.profit for trade in trades])
+-116
+>>> len(trades)
+29
+>>> for trade in trades: print trade.profit,trade.open_time,trade.open_base_price,trade.open_price,trade.close_time%1000000,trade.close_price
+    
+    9.10合约 76.2点/109次
+    8合约: -37
+    '''
+    def __init__(self,ulen=60,dlen=60,dfilter=16):
+        '''
+            在18-23(20+冲击24), 100-150(120+冲击16/30)有两个光谱带
+        '''
+        self.it = 0  #计数
+        self.ulen = ulen
+        self.dlen = dlen        
+        self.dfilter = dfilter
+        self.upeaks = []
+        self.dpeaks = []
+        self.iupeaks = []
+        self.idpeaks = []
+        self.ubuffer = BUFFER(ulen*2+1)
+        self.dbuffer = BUFFER(dlen*2+1)        
+        self.wbuffer = BUFFER(200)
+
+    def tick(self,tick):
+        super(hb123_opener,self).tick(tick) 
+        self.ubuffer.exchange(tick.price)
+        self.dbuffer.exchange(tick.price)        
+        self.wbuffer.exchange(tick.price)
+        if self.ubuffer.is_mid_upeak2():
+            self.upeaks.append(self.ubuffer.peek_mid())
+            self.iupeaks.append(self.it - self.ulen)
+        if self.dbuffer.is_mid_dpeak2():
+            self.dpeaks.append(self.dbuffer.peek_mid())
+            self.idpeaks.append(self.it - self.dlen)
+        self.it += 1
+
+    def check(self,cur_trade):
+        if self.cur_tick.min1 < 930:
+            return False
+        if cur_trade.env.psum < -120:#停摆
+            return False
+        if len(self.upeaks)>=2 and len(self.dpeaks)>=3 and (
+                self.cur_tick.price > self.upeaks[-1] + 4
+                and self.dpeaks[-1] > self.dpeaks[-2] 
+                and self.upeaks[-1] > self.upeaks[-2] 
+                and self.idpeaks[-1] < self.iupeaks[-1]
+                and self.idpeaks[-1] > self.iupeaks[-2]
+            ):
+            #print self.cur_tick.time,self.dpeaks[-5:],self.upeaks[-5:]
+            return True
+        return False
+
 class s123_opener(TICK_SHORT_OPENER):
     '''
         前低突破
