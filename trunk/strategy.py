@@ -5,6 +5,9 @@
     包括紧盯的合约
     目前支持手工设定标的合约，有时间时自动盘前判断主力合约
 
+    因为现在opener中没有做日的初始化。所以不能连续不间断运行。只能每天8:50启动下.
+        不能在Agent中来重新初始化Opener,因为opener可能含有不可直接恢复的跨日状态.
+
 '''
 
 import logging
@@ -181,6 +184,26 @@ class Resumable(object):#可中间恢复
     def load_parameters(self,parameters):  #重新装载参数
         self.__dict__.update(eval(parameters))
     
+
+    def resume(self,data,scur_day):  #恢复opener/stop的状态,主要用于opener
+        if len(data.sdate) == 0:    #史前
+            return
+        elif data.sdate[-1] < scur_day:  #scur_day>data.vdate,当日还没有开始,不需要resume
+            return
+        elif data.sdate[-1] == scur_day:
+            i = len(data.sdate)-2
+            while i>=0 and data.sdate[i]==scur_day:
+                 i -= 1
+            i += 1  #当日数据的开始
+            self.dresume(data,i)
+        else:#不可能
+            logging.error(u'scur_day=%s,小于行情日%s' % (scur_day,data.sdate[-1]))
+        pass
+
+    def dresume(self,data,i):#min序列从i开始为当日数据
+        logging.info(u'Resumable数据恢复中....')
+        pass
+
 
 ###突破类策略
 ###突破类策略以当前价为基准价，以一定额度的加价作为开仓限价以确保开仓，同时根据基准价来计算止损
@@ -466,6 +489,7 @@ class STRATEGY(object):#策略基类, 单纯包装
                 max_holding, #最大持仓手数 
             ):
         self.name = name
+        self.opener_class = opener
         self.opener = opener()  #单一策略可共享开仓对象
         self.closer = closer    #平仓对象必须用开仓时的上下文初始化
         self.open_volume = open_volume
