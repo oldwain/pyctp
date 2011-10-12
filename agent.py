@@ -249,7 +249,8 @@ class MdSpiDelegate(MdSpi):
         scur_day = int(time.strftime('%Y%m%d'))
         if scur_day > self.agent.scur_day:    #换日,重新设置volume
             self.logger.info(u'MD:换日, %s-->%s' % (self.agent.scur_day,scur_day))
-            self.agent.scur_day = scur_day
+            #self.agent.scur_day = scur_day
+            self.agent.day_switch(scur_day)
             MdSpiDelegate.last_map = dict([(id,0) for id in self.instruments])
         if is_last and not self.checkErrorRspInfo(info):
             self.logger.info(u"MD:get today's trading day:%s" % repr(self.api.GetTradingDay()))
@@ -1113,7 +1114,7 @@ class Agent(AbsAgent):
                 if order.opened_volume > 0 and order.close_lock == False:
                     mysignal = order.stoper.check(ctick)
                     if mysignal[0] != 0 and order.close_lock == False:    #平仓
-                        logging.info(u'平仓信号,time=%s,inst=%s' % (ctick.time,cur_inst.name))
+                        logging.info(u'平仓信号,time=%s,inst=%s,cur_price=%s' % (ctick.time,cur_inst.name,ctick.price))
                         signals.append(BaseObject(instrument=cur_inst,
                                 volume=order.opened_volume,
                                 direction = dir_py2ctp(order.stoper.direction),
@@ -1362,7 +1363,9 @@ class Agent(AbsAgent):
                 1. 获得必要的历史数据
                 2. 获得当日分钟数据, 并计算相关指标
                 3. 获得当日持仓，并初始化止损. 
+                4. 需要恢复当日opener的状态。ticks重新填入?
         '''
+        ##resume order
         state = config.parse_state(self.strategy_cfg,self.instruments)
         cposs = set([])
         for chd in state.holdings.values():
@@ -1379,7 +1382,19 @@ class Agent(AbsAgent):
                 cposs.add(cur_position)
         for pos in cposs:
             pos.re_calc()
+
+        ##resume opener
+        for cur_inst in self.instruments.values():
+            for ss in cur_inst.strategy.values():
+                ss.opener.resume(cur_inst.data,self.scur_day)
         return state
+
+    def day_switch(self,scur_day):  #重新初始化opener
+        self.scur_day = scur_day
+        for cur_inst in self.instruments.values():
+            for ss in cur_inst.strategy.values():
+                ss.opener = ss.opener_class()
+
     ###交易
 
     ###回应
@@ -1390,7 +1405,7 @@ class Agent(AbsAgent):
                    在OnTrade中进行position的细致处理 
             #TODO: 必须处理策略分类持仓汇总和持仓总数不匹配时的问题
         '''
-        logging.info(u'A_RT1:成交回报,%s:orderref=%s,orders=%s,price=%s' % (self.instruments,strade.OrderRef,self.ref2order,strade.Price))
+        logging.info(u'A_RT1:成交回报,%s:orderref=%s,orders=%s,price=%s' % (strade.InstrumentID,strade.OrderRef,self.ref2order,strade.Price))
         if int(strade.OrderRef) not in self.ref2order or strade.InstrumentID not in self.instruments:
             logging.warning(u'A_RT2:收到非本程序发出的成交回报:%s-%s' % (strade.InstrumentID,strade.OrderRef))
         cur_inst = self.instruments[strade.InstrumentID]
