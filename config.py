@@ -149,7 +149,8 @@ CFs = CF109,CF107
             #current_strategy.closer = smod.__dict__[cfg.get(sscs,'closer').strip()]
             current_strategy = strategy.STRATEGY(name = sscs,
                     opener = smod.__dict__[cfg.get(sscs,'opener').strip()],
-                    closer = smod.__dict__[cfg.get(sscs,'closer').strip()],
+                    #closer = smod.__dict__[cfg.get(sscs,'closer').strip()],
+                    closers = [smod.__dict__[sc.strip()] for sc in cfg.get(sscs,'closers').split(',') if sc.strip()!=''],
                     max_holding = int(cfg.get(sscs,'max_holding')),
                     open_volume = int(cfg.get(sscs,'open_volume')),
                 )
@@ -221,9 +222,16 @@ def parse_state(strategy_cfg,instruments,name='state.ini',root='State'):
             order.strategy_name = cfg.get(soo,'strategy_name')
             #order.opener = strategy_cfg.smodule.__dict__[cfg.get(soo,'opener').strip()] #仅用于判断strategy
             #order.stoper_class = strategy_cfg.smodule.__dict__[cfg.get(soo,'stoper').strip()]
-            order.stoper = strategy_cfg.smodule.__dict__[cfg.get(soo,'stoper').strip()](cur_inst.data,0) #满足签名
-            order.stoper.load_parameters(cfg.get(soo,'stoper_parameters').strip())
-            state.mys = cfg.get(soo,'stoper_parameters').strip()   #调试用
+            
+            #order.stoper = strategy_cfg.smodule.__dict__[cfg.get(soo,'stoper').strip()](cur_inst.data,0) #满足签名
+            #order.stoper.load_parameters(cfg.get(soo,'stoper_parameters').strip())
+            sps = eval(cfg.get(soo,'stopers'))
+            order.stopers = []
+            for stoper,sparameter in sps:
+                stoper = strategy_cfg.smodule.__dict__[stoper.strip()](cur_inst.data,0)
+                stoper.load_parameters(sparameter)
+                order.stopers.append(stoper)
+            #state.mys = cfg.get(soo,'stoper_parameters').strip()   #调试用
             #print cfg.get(soo,'stoper_parameters').strip()
             order.base_price = int(cfg.get(soo,'base_price').strip())
             order.mytime = int(cfg.get(soo,'mytime').strip()) 
@@ -295,8 +303,11 @@ def save_state(state,name='state.ini',root='State'):
             cfg.set(mystr,'strategy_name',order.get_strategy_name())
             #cfg.set(mystr,'opener',base.type_name(order.get_opener()))
             #cfg.set(mystr,'opener_parameters',order.get_opener().save_parameters())
-            cfg.set(mystr,'stoper',base.type_name(order.get_stoper()))
-            cfg.set(mystr,'stoper_parameters',order.stoper.save_parameters())
+            #cfg.set(mystr,'stoper',"('%s',%s)" % (base.type_name(order.get_stoper()),order.stoper.save_parameters()))
+            ss =[ "('%s',%s)" % (base.type_name(stoper),stoper.save_parameters()) for stoper in order.get_stopers()]
+            cfg.set(mystr,'stopers',','.join(ss))
+            #cfg.set(mystr,'stoper',base.type_name(order.get_stoper()))
+            #cfg.set(mystr,'stoper_parameters',order.stoper.save_parameters())
             if order.target_price>0:
                 cfg.set(mystr,'target_price',order.target_price)
         cfg.set(key,'opened_orders',','.join(ostr))
