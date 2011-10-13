@@ -112,7 +112,7 @@ CFs = CF109,CF107
     [IF1104_L1]
     volume = xxxx
     opener = xxxx
-    stoper = xxxx
+    stopers = xxxx,yyyy
     open_price = 3200
     current_stop_price = 3193
 
@@ -637,7 +637,7 @@ class c_instrument(object):
         #设定的最大持仓手数
         self.max_volume = 1
 
-        #应用策略 开仓函数名 ==> BaseObject(instrument_id,strategy_name,position_type,volume,stoper)
+        #应用策略 开仓函数名 ==> STRATEGY对象)
         self.strategy = {}
         
         #行情数据
@@ -796,6 +796,9 @@ class Agent(AbsAgent):
         self.lock = threading.Lock()
         #保存分钟数据标志
         self.save_flag = False  #默认不保存
+
+        #actions
+        self.actions = []
 
         self.init_init()    #init中的init,用于子类的处理
 
@@ -987,6 +990,8 @@ class Agent(AbsAgent):
             #print 'in day_finalize'
             if self.save_flag == True:
                 hreader.check_merge(ddata.name,self.scur_day)
+        for action in self.actions:
+            logging.info(u'%s' % (str(action),))
 
     def save_min(self,dinst):
         ddata = dinst.data
@@ -1112,14 +1117,16 @@ class Agent(AbsAgent):
         for position in cur_inst.position_detail.values():
             for order in position.orders:
                 if order.opened_volume > 0 and order.close_lock == False:
-                    mysignal = order.stoper.check(ctick)
+                    #mysignal = order.stoper.check(ctick)
+                    mysignal = order.check_stop(ctick)
                     if mysignal[0] != 0 and order.close_lock == False:    #平仓
                         logging.info(u'平仓信号,time=%s,inst=%s,cur_price=%s' % (ctick.time,cur_inst.name,ctick.price))
                         signals.append(BaseObject(instrument=cur_inst,
                                 volume=order.opened_volume,
-                                direction = dir_py2ctp(order.stoper.direction),
+                                direction = dir_py2ctp(order.get_stop_direction()),
                                 base_price = mysignal[1],
-                                target_price=order.stoper.calc_target_price(mysignal[1],cur_inst.tick_base),
+                                #target_price=order.stoper.calc_target_price(mysignal[1],cur_inst.tick_base),
+                                target_price=order.calc_stop_price(mysignal[1],cur_inst.tick_base),
                                 source_order = order, #原始头寸
                                 mytime = ctick.time,
                                 action_type = XCLOSE,
@@ -1235,10 +1242,12 @@ class Agent(AbsAgent):
                     logging.info(u'策略%s,可下单数=0,中止' % (order.position,))
                     continue
                 ##有效Order
+                self.actions.append(('open',order.mytime,order.direction,order.get_strategy_name(),order.base_price,order.volume,order.target_price))
                 command.volume = order.volume
                 self.ref2order[command.order_ref] = order
                 ##初始化止损类
-                order.stoper = order.position.strategy.closer(order.instrument.data,order.base_price)
+                #order.stoper = order.position.strategy.closer(order.instrument.data,order.base_price)
+                order.init_stopers(order.instrument.data,order.base_price)
                 order.position.add_order(order)
                 #............ 加锁完毕. 这样，同一instrument本时刻再有其它策略的开仓时，其calc_remained_volume能返回合适值
                 logging.info(u'A_MC:当前tick=%s,下单有效时长(超过该时长未成交则撤单)=%s' % (self.get_tick(),order.position.strategy.opener.valid_length,))
@@ -1249,12 +1258,18 @@ class Agent(AbsAgent):
                 #print u'平仓'
                 #self.ref2order[command.order_ref] = order.source_order
                 logging.info(u'A_MC_C:平仓处理')
+                self.actions.append(('close',order.mytime,order.direction,order.source_order.get_strategy_name(),order.base_price,order.volume,order.target_price))
                 self.ref2order[command.order_ref] = order   #2011-8-6
-                self.put_command(self.get_tick()+order.source_order.stoper.valid_length,fcustom(self.cancel_command,command=command))
-                self.put_command(self.get_tick()+order.source_order.stoper.valid_length+1,lambda : order.source_order.release_close_lock())
-                logging.info(u'A_MC_D:设置平仓撤单完成,cur_tick=%s,触发点=%s' % (self.get_tick(),self.get_tick()+order.source_order.stoper.valid_length))
+                #self.put_command(self.get_tick()+order.source_order.stoper.valid_length,fcustom(self.cancel_command,command=command))
+                #self.put_command(self.get_tick()+order.source_order.stoper.valid_length+1,lambda : order.source_order.release_close_lock())
+                #logging.info(u'A_MC_D:设置平仓撤单完成,cur_tick=%s,触发点=%s' % (self.get_tick(),self.get_tick()+order.source_order.stoper.valid_length))
+                self.put_command(self.get_tick()+order.source_order.get_stop_valid_length(),fcustom(self.cancel_command,command=command))
+                self.put_command(self.get_tick()+order.source_order.get_stop_valid_length()+1,lambda : order.source_order.release_close_lock())
+                logging.info(u'A_MC_D:设置平仓撤单完成,cur_tick=%s,触发点=%s' % (self.get_tick(),self.get_tick()+order.source_order.get_stop_valid_length()))
+                #logging.info(u'发出平仓指令，cur_tick=%s,释放锁的时间是=%s' % (self.get_tick(),self.get_tick()+order.source_order.get_stop_valid_length()+1))
+                logging.info(u'发出平仓指令，cur_tick=%s,释放锁的时间是=%s' % (self.get_tick(),self.get_tick()+order.source_order.get_stop_valid_length()+1))
                 self.close_position(command)
-                logging.info(u'发出平仓指令，cur_tick=%s,释放锁的时间是=%s' % (self.get_tick(),self.get_tick()+order.source_order.stoper.valid_length+1))
+
 
     def open_position(self,order):
         ''' 
@@ -1371,11 +1386,13 @@ class Agent(AbsAgent):
         for chd in state.holdings.values():
             cur_inst = self.instruments[chd.instrument]
             for order in chd.orders:
-                order.stoper.data = cur_inst.data   #填充data, 另bline已经搞定
+                #order.stoper.data = cur_inst.data   #填充data, 另bline已经搞定
                 cur_position = cur_inst.position_detail[order.strategy_name]
                 xorder = strategy.Order(cur_position,order.base_price,order.target_price,order.mytime,order.action_type)
                 xorder.volume = xorder.opened_volume = order.volume
-                xorder.stoper = order.stoper
+                #xorder.stoper = order.stoper
+                xorder.stopers = order.stopers
+                xorder.set_stopers_data(cur_inst.data)
                 xorder.cancelled = True #需要手工撤掉未成交的单子
                 #cur_position.add_order(order)
                 cur_position.add_order(xorder)
@@ -1391,6 +1408,7 @@ class Agent(AbsAgent):
 
     def day_switch(self,scur_day):  #重新初始化opener
         self.scur_day = scur_day
+        self.actions = []
         for cur_inst in self.instruments.values():
             for ss in cur_inst.strategy.values():
                 ss.opener = ss.opener_class()

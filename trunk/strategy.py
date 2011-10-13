@@ -47,7 +47,7 @@ class Order(object):
         ##
         self.volume = 0 #目标成交手数,锁定总数
         self.opened_volume = 0  #实际成交手数
-        self.stoper = None
+        self.stopers = []
         self.trade_detail = []
         self.cancelled = False  #是否已经撤单
         self.close_lock = False #平仓锁定，即已经发出平仓信号
@@ -81,14 +81,40 @@ class Order(object):
     def is_closed(self): #是否已经完全平仓
         return self.cancelled and self.opened_volume == 0
 
+    def get_strategy_name(self):
+        return self.position.strategy.name
+
     def get_opener(self):
         return self.position.strategy.opener
 
-    def get_stoper(self):
-        return self.stoper
+    def init_stopers(self,data,base_price):
+        self.stopers = []
+        for stoper in self.position.strategy.closers:
+            self.stopers.append(stoper(data,base_price))
 
-    def get_strategy_name(self):
-        return self.position.strategy.name
+    def check_stop(self,ctick):
+        for stoper in self.stopers:
+            mysignal = stoper.check(ctick)
+            if mysignal[0] != 0 and not self.close_lock:
+                return mysignal
+        return (False,0,False)
+        
+    def calc_stop_price(self,base_price,tick_base):
+        return self.stopers[0].calc_target_price(base_price,tick_base) if len(self.stopers)>0 else 0;
+
+    def set_stopers_data(self,data):
+        for stoper in self.stopers:
+            stoper.data = data
+
+    def get_stopers(self):
+        return self.stopers
+
+    def get_stop_valid_length(self):
+        return self.stopers[0].valid_length if len(self.stopers)>0 else 0   #只取第一个
+
+    def get_stop_direction(self):
+        return self.stopers[0].direction if len(self.stopers)>0 else EMPTY  #只取第一个
+
 
     def release_close_lock(self):
         logging.info(u'释放平仓锁,order=%s' % self.__str__())
@@ -100,7 +126,7 @@ class Order(object):
                 u'多' if self.direction==utype.THOST_FTDC_D_Buy else u'空',
                 self.volume,
                 self.opened_volume,
-                u'无效' if self.cancelled else u'有效',
+                u'已撤' if self.cancelled else u'未撤',
             )
 
 ####头寸
@@ -182,8 +208,8 @@ class Resumable(object):#可中间恢复
         return u'{%s}' % (','.join(parameters),)
 
     def load_parameters(self,parameters):  #重新装载参数
-        self.__dict__.update(eval(parameters))
-    
+        #self.__dict__.update(eval(parameters))
+        self.__dict__.update(parameters)
 
     def resume(self,data,scur_day):  #恢复opener/stop的状态,主要用于opener
         if len(data.sdate) == 0:    #史前
@@ -196,7 +222,7 @@ class Resumable(object):#可中间恢复
                  i -= 1
             i += 1  #当日数据的开始
             self.dresume(data,i)
-        else:#不可能
+        else:#只有在测试时可能,但也是错误情况
             logging.error(u'scur_day=%s,小于行情日%s' % (scur_day,data.sdate[-1]))
         pass
 
@@ -226,6 +252,8 @@ class LONG_BREAK(BREAK):    #多头突破策略
         self.name = u'多头突破基类'
 
     def calc_target_price(self,base_price,tick_base):    #计算开单加价
+        if base_price % tick_base > 0:  #取整
+            base_price = (base_price / tick_base + 1) * tick_base 
         return base_price + tick_base * self.max_overflow
 
 class SHORT_BREAK(BREAK):   #空头突破策略
@@ -236,6 +264,8 @@ class SHORT_BREAK(BREAK):   #空头突破策略
         self.name = u'空头突破基类'
 
     def calc_target_price(self,base_price,tick_base):#计算开仓加价
+        if base_price % tick_base > 0:
+            base_price = (base_price / tick_base - 1) * tick_base
         return base_price - tick_base * self.max_overflow
 
 
@@ -312,6 +342,8 @@ class LONG_STOPER(STOPER):
         self.name = u'多头离场基类'
 
     def calc_target_price(self,base_price,tick_base):#计算多头平仓加价,
+        if base_price % tick_base > 0:
+            base_price = (base_price / tick_base - 1) * tick_base 
         return base_price - tick_base * self.max_overflow
 
 
@@ -328,6 +360,8 @@ class SHORT_STOPER(STOPER):
         self.name = u'空头离场基类'
 
     def calc_target_price(self,base_price,tick_base):#计算空头平仓加价,
+        if base_price % tick_base > 0:
+            base_price = (base_price / tick_base + 1) * tick_base 
         return base_price + tick_base * self.max_overflow
 
     def check(self,tick):
@@ -403,7 +437,7 @@ class LONG_MOVING_STOPER(LONG_STOPER):
     '''
         简化的移动跟踪止损, 达到快速提升止损和和逐步放开盈利端的平衡
     '''
-    def __init__(self,data,bline,lost_base=100,max_drawdown=360,tstep=40,vstep=20,stime=1500):
+    def __init__(self,data,bline,lost_base=100,max_drawdown=360,tstep=40,vstep=20):
         '''
            data:行情对象
            bline: 价格基线
@@ -415,7 +449,6 @@ class LONG_MOVING_STOPER(LONG_STOPER):
         self.stop0 = bline - lost_base
         self.name = u'多头移动止损,初始止损=%s,步长=%s/%s,最大回撤=%s' % (self.stop0,vstep,tstep,max_drawdown)
         self.thigh = bline
-        self.stime = stime
         self.tstep = tstep
         self.vstep = vstep
         logging.info(self.name)
@@ -426,7 +459,7 @@ class LONG_MOVING_STOPER(LONG_STOPER):
             基准价为0则为当前价
         '''
         stop_changed = False
-        if tick.price < self.get_cur_stop() or tick.min1 >= self.stime:
+        if tick.price < self.get_cur_stop():
             logging.info(u'LMS_C:tick.time=%s,tick.min1=%s,tick.price=%s,cur_stop=%s' % (tick.time,tick.min1,tick.price,self.get_cur_stop()))
             return (True,tick.price,stop_changed)
         if tick.price > self.thigh:
@@ -440,7 +473,7 @@ class LONG_MOVING_STOPER(LONG_STOPER):
 
 
 class SHORT_MOVING_STOPER(SHORT_STOPER):#空头移动止损
-    def __init__(self,data,bline,lost_base=100,max_drawdown=360,tstep=40,vstep=20,stime=1500):
+    def __init__(self,data,bline,lost_base=100,max_drawdown=360,tstep=40,vstep=20):
         '''
            data:行情对象
            bline: 价格基线
@@ -452,7 +485,6 @@ class SHORT_MOVING_STOPER(SHORT_STOPER):#空头移动止损
         self.stop0 = bline + lost_base
         self.name = u'空头移动止损,初始止损=%s,步长=%s/%s,最大回撤=%s' % (self.stop0,vstep,tstep,max_drawdown)
         self.tlow = bline
-        self.stime = stime
         self.vstep = vstep
         self.tstep = tstep
         logging.info(self.name)
@@ -463,7 +495,7 @@ class SHORT_MOVING_STOPER(SHORT_STOPER):#空头移动止损
             基准价为0则为当前价
         '''
         stop_changed = False
-        if tick.price > self.get_cur_stop() or tick.min1 >= self.stime:
+        if tick.price > self.get_cur_stop():
             return (True,tick.price,stop_changed)
         if tick.price < self.tlow:
             self.tlow = tick.price
@@ -476,22 +508,75 @@ class SHORT_MOVING_STOPER(SHORT_STOPER):#空头移动止损
                 stop_changed = True
         return (False,self.get_base_line(),stop_changed)
 
-if_lmv_stoper = fcustom(LONG_MOVING_STOPER,stime = 1459)
-if_smv_stoper = fcustom(SHORT_MOVING_STOPER,stime = 1459)
+if_lmv_stoper = LONG_MOVING_STOPER
+if_smv_stoper = SHORT_MOVING_STOPER
 
+class LONG_TIME_STOPER(LONG_STOPER):
+    '''
+        时间平仓,多
+    '''
+    def __init__(self,data,bline,stime=1500):
+        '''
+           data:行情对象
+           bline: 价格基线
+        '''
+        LONG_STOPER.__init__(self,data,bline)
+        self.stime = stime
+        self.name = u'多头时间离场'
+        logging.info(self.name)
+
+    def check(self,tick):
+        '''
+            必须返回(平仓标志, 基准价,stop变化标志)
+            基准价为0则为当前价
+        '''
+        if tick.min1 >= self.stime:
+            logging.info(u'LTS_C:tick.time=%s,tick.min1=%s,tick.price=%s,cur_stop=%s' % (tick.time,tick.min1,tick.price,self.get_cur_stop()))
+            return (True,tick.price,False)
+        return (False,self.get_base_line(),False)
+
+if_ltime_stoper = fcustom(LONG_TIME_STOPER,stime=1459)
+c_ltime_stoper = fcustom(LONG_TIME_STOPER,stime=1444)
+
+class SHORT_TIME_STOPER(SHORT_STOPER):
+    '''
+        时间平仓, 空
+    '''
+    def __init__(self,data,bline,stime=1500):
+        '''
+           data:行情对象
+           bline: 价格基线
+        '''
+        SHORT_STOPER.__init__(self,data,bline)
+        self.stime = stime
+        self.name = u'空头时间离场'
+        logging.info(self.name)
+
+    def check(self,tick):
+        '''
+            必须返回(平仓标志, 基准价,stop变化标志)
+            基准价为0则为当前价
+        '''
+        if tick.min1 >= self.stime:
+            logging.info(u'LTS_C:tick.time=%s,tick.min1=%s,tick.price=%s,cur_stop=%s' % (tick.time,tick.min1,tick.price,self.get_cur_stop()))
+            return (True,tick.price,False)
+        return (False,self.get_base_line(),False)
+
+if_stime_stoper = fcustom(SHORT_TIME_STOPER,stime=1459)
+c_stime_stoper = fcustom(SHORT_TIME_STOPER,stime=1444)
 
 class STRATEGY(object):#策略基类, 单纯包装
     def __init__(self,
                 name,
                 opener, #开仓类(注意，不是对象)
-                closer, #平仓类(注意，不是对象)
+                closers, #平仓类(注意，不是对象)
                 open_volume, #每次开仓手数   
                 max_holding, #最大持仓手数 
             ):
         self.name = name
         self.opener_class = opener
         self.opener = opener()  #单一策略可共享开仓对象
-        self.closer = closer    #平仓对象必须用开仓时的上下文初始化
+        self.closers = closers    #平仓对象必须用开仓时的上下文初始化
         self.open_volume = open_volume
         self.max_holding = max_holding
         self.direction = self.opener.direction
