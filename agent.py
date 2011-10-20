@@ -1136,6 +1136,7 @@ class Agent(AbsAgent):
                         #     或者更进一步，直接认为平仓必然成功，然后设定已经被平标志，默认已经被平  
                         order.close_lock = True
                     if mysignal[2] != 0:#止损位置变化
+                        logging.info(u'止损位变化.....')
                         is_touched = True
         if is_touched:
             self.save_state()
@@ -1358,6 +1359,7 @@ class Agent(AbsAgent):
         '''
             保存环境
         '''
+        logging.info(u'保存执行状态.....................')
         state = BaseObject(last_update=int(time.strftime('%Y%m%d')),holdings={})
         cur_orders = {} #instrument==>orders
         for inst in self.instruments.values():
