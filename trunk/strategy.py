@@ -93,11 +93,14 @@ class Order(object):
             self.stopers.append(stoper(data,base_price))
 
     def check_stop(self,ctick):
+        is_touched = False
         for stoper in self.stopers:
             mysignal = stoper.check(ctick)
             if mysignal[0] != 0 and not self.close_lock:
                 return mysignal
-        return (False,0,False)
+            if mysignal[2] != 0:
+                is_touched = True
+        return (False,0,is_touched)
         
     def calc_stop_price(self,base_price,tick_base):
         return self.stopers[0].calc_target_price(base_price,tick_base) if len(self.stopers)>0 else 0;
@@ -503,10 +506,12 @@ class SHORT_MOVING_STOPER(SHORT_STOPER):#空头移动止损
             #nstop = self.stop0 + (tick.price - self.base_line) / self.tstep * self.vstep    #不能这样，因为tick.price<self.base_line,所以会有四舍五入问题，-0.12舍入成-1
             if nstop < self.get_cur_stop():
                 logging.info(u'移动平仓位置，新低点=%s,原平仓点=%s,现平仓点=%s,cur_price=%s,self.base_line=%s,stop0=%s' % (tick.price,self.get_cur_stop(),nstop,tick.price,self.base_line,self.stop0))
-                logging.info(u'dp=%s,dp/tstep=%s' %(tick.price - self.base_line,(tick.price - self.base_line) / self.tstep))
+                #logging.info(u'dp=%s,dp/tstep=%s' %(tick.price - self.base_line,(tick.price - self.base_line) / self.tstep))
                 self.set_cur_stop(nstop)
+                logging.info(u'cur_stop=%s' %(self.cur_stop,))
                 stop_changed = True
         return (False,self.get_base_line(),stop_changed)
+
 
 if_lmv_stoper = LONG_MOVING_STOPER
 if_smv_stoper = SHORT_MOVING_STOPER
