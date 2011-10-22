@@ -198,8 +198,8 @@ import hreader
 
 ctp_mock.log_config()
 
-preday = 20111011
-tday = 20111012
+preday = 2011018
+tday = 20111019
 instrument = 'IF1111'
 myagent = ctp_mock.create_agent_with_mocktrader(instrument,-1)    #不需要tday的当日数据
 myagent.instruments[instrument].t2order = base.t2order_if
