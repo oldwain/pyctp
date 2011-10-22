@@ -492,7 +492,7 @@ class TraderSpiDelegate(TraderSpi):
             请求查询资金账户响应
         '''
         print u'查询资金账户响应'
-        self.logger.debug(u'TD:资金账户响应:%s' % pTradingAccount)
+        self.logger.info(u'TD:资金账户响应:%s' % pTradingAccount)
         if bIsLast and self.isRspSuccess(pRspInfo):
             self.agent.rsp_qry_trading_account(pTradingAccount)
         else:
