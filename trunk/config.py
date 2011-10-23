@@ -136,6 +136,8 @@ CFs = CF109,CF107
             continue
         cs = base.BaseObject(name=alias[sti])
         cs.max_volume = int(cfg.get(sti,'max_volume'))
+        cs.max_vtimes = int(cfg.get(sti,'max_vtimes'))
+        cs.max_lost = int(cfg.get(sti,'max_lost'))
         cs.strategys = []
         for scs in cfg.get(sti,'strategys').split(','):
             sscs = scs.strip()

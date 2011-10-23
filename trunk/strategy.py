@@ -81,6 +81,14 @@ class Order(object):
     def is_closed(self): #是否已经完全平仓
         return self.cancelled and self.opened_volume == 0
 
+    def get_profit(self):
+        if not self.is_closed():    #未完全平仓的，返回0
+            return 0
+        rp = sum([td[0]*td[1] for td in self.trade_detail])
+        if self.position.strategy.direction==LONG:
+            return -rp
+        return rp
+
     def get_strategy_name(self):
         return self.position.strategy.name
 
@@ -116,7 +124,8 @@ class Order(object):
         return self.stopers[0].valid_length if len(self.stopers)>0 else 0   #只取第一个
 
     def get_stop_direction(self):
-        return self.stopers[0].direction if len(self.stopers)>0 else EMPTY  #只取第一个
+        return utype.THOST_FTDC_D_Sell if self.direction == utype.THOST_FTDC_D_Buy else utype.THOST_FTDC_D_Buy
+        #return self.stopers[0].direction if len(self.stopers)>0 else EMPTY  #只取第一个
 
 
     def release_close_lock(self):
@@ -241,15 +250,18 @@ class Resumable(object):#可中间恢复
     返回值为(触发标志,触发价格), 触发标志!=0时触发，触发价格==0时为当前价
 '''
 
-MAX_OVERFLOW = 60   #最大溢点，即开仓时加价跳数
-VALID_LENGTH = 120  #行情跳数, 至少两分钟(视行情移动为准)
+#MAX_OPEN_OVERFLOW = 60   #最大溢点，即开仓时加价跳数
+MAX_OPEN_OVERFLOW = 30   #最大溢点，即开仓时加价跳数
+MAX_CLOSE_OVERFLOW = 120
+VALID_LENGTH = 120  #开仓指令持续时间.行情跳数, 至少两分钟(视行情移动为准)
+STOP_VALID_LENGTH = 6   #平仓指令持续时间.最好是1秒后就撤单, 以便及时追平. 但是因为平仓回报比较慢，需要等待?
 
 class BREAK(Resumable):    #策略标记
     pass
 
 class LONG_BREAK(BREAK):    #多头突破策略
     direction = LONG
-    def __init__(self,max_overflow=60,valid_length=VALID_LENGTH):
+    def __init__(self,max_overflow=MAX_OPEN_OVERFLOW,valid_length=VALID_LENGTH):
         self.max_overflow = max_overflow    #溢点用于计算目标价
         self.valid_length = valid_length    #有效期用于计算撤单时间
         self.name = u'多头突破基类'
@@ -261,7 +273,7 @@ class LONG_BREAK(BREAK):    #多头突破策略
 
 class SHORT_BREAK(BREAK):   #空头突破策略
     direction = SHORT
-    def __init__(self,max_overflow=60,valid_length=VALID_LENGTH):
+    def __init__(self,max_overflow=MAX_OPEN_OVERFLOW,valid_length=VALID_LENGTH):
         self.max_overflow = max_overflow    #溢点用于计算目标价
         self.valid_length = valid_length    #有效期用于计算撤单时间
         self.name = u'空头突破基类'
@@ -313,8 +325,6 @@ class day_short_break(SHORT_BREAK):
         calc_target_price(self,base_price,tick_base) #计算平仓限价, 其中tick_base是每跳幅度
 '''
 
-STOP_VALID_LENGTH = 6   #最好是1秒后就撤单, 以便及时追平. 但是因为平仓回报比较慢，需要等待?
-
 class STOPER(Resumable):    #离场类标记
     '''
         对于必须要实现断点恢复的stoper类，必须使用self.base_line和self.cur_stop作为判断标准
@@ -337,7 +347,7 @@ class STOPER(Resumable):    #离场类标记
         self.base_line = base_line
 
 class LONG_STOPER(STOPER):
-    def __init__(self,data,bline,max_overflow=120,valid_length=STOP_VALID_LENGTH):
+    def __init__(self,data,bline,max_overflow=MAX_CLOSE_OVERFLOW,valid_length=STOP_VALID_LENGTH):
         STOPER.__init__(self,data,bline)
         self.direction = SHORT
         self.max_overflow = max_overflow    #溢点用于计算目标价
@@ -355,7 +365,7 @@ class LONG_STOPER(STOPER):
 
 
 class SHORT_STOPER(STOPER):
-    def __init__(self,data,bline,max_overflow=120,valid_length=STOP_VALID_LENGTH):
+    def __init__(self,data,bline,max_overflow=MAX_CLOSE_OVERFLOW,valid_length=STOP_VALID_LENGTH):
         STOPER.__init__(self,data,bline)
         self.direction = LONG
         self.max_overflow = max_overflow    #溢点用于计算目标价
@@ -440,10 +450,12 @@ class LONG_MOVING_STOPER(LONG_STOPER):
     '''
         简化的移动跟踪止损, 达到快速提升止损和和逐步放开盈利端的平衡
     '''
-    def __init__(self,data,bline,lost_base=100,max_drawdown=360,tstep=40,vstep=20):
+    def __init__(self,data,bline,lost_base=100,max_drawdown=360,pmax_drawdown=0.011,tstep=40,vstep=20):
         '''
            data:行情对象
            bline: 价格基线
+           max_drawdown: 最大回撤
+           pmax_drawdown: 最大回撤比例(相对开仓价)
         '''
         LONG_STOPER.__init__(self,data,bline)
         self.lost_base = lost_base
@@ -454,6 +466,11 @@ class LONG_MOVING_STOPER(LONG_STOPER):
         self.thigh = bline
         self.tstep = tstep
         self.vstep = vstep
+
+        #self.max_drawdown = max_drawdown
+        #self.pmax_drawdown = pmax_drawdown
+        pmd = pmax_drawdown * bline
+        self.cmax_drawdown =  pmd if pmd < max_drawdown else max_drawdown   #最大回撤取小者
         logging.info(self.name)
 
     def check(self,tick):
@@ -468,6 +485,9 @@ class LONG_MOVING_STOPER(LONG_STOPER):
         if tick.price > self.thigh:
             self.thigh = tick.price
             nstop = self.stop0 + (tick.price - self.base_line) / self.tstep * self.vstep
+            m_nstop = tick.price - self.cmax_drawdown
+            if m_nstop > nstop:
+                nstop = m_nstop
             if nstop > self.get_cur_stop():
                 logging.info(u'移动平仓位置，新高点=%s,原平仓点=%s,现平仓点=%s' % (tick.price,self.get_cur_stop(),nstop))
                 self.set_cur_stop(nstop)
@@ -476,7 +496,7 @@ class LONG_MOVING_STOPER(LONG_STOPER):
 
 
 class SHORT_MOVING_STOPER(SHORT_STOPER):#空头移动止损
-    def __init__(self,data,bline,lost_base=100,max_drawdown=360,tstep=40,vstep=20):
+    def __init__(self,data,bline,lost_base=100,max_drawdown=360,pmax_drawdown=0.011,tstep=40,vstep=20):
         '''
            data:行情对象
            bline: 价格基线
@@ -490,6 +510,11 @@ class SHORT_MOVING_STOPER(SHORT_STOPER):#空头移动止损
         self.tlow = bline
         self.vstep = vstep
         self.tstep = tstep
+
+        #self.max_drawdown = max_drawdown
+        #self.pmax_drawdown = pmax_drawdown
+        pmd = pmax_drawdown * bline
+        self.cmax_drawdown =  pmd if pmd < max_drawdown else max_drawdown   #最大回撤取小者
         logging.info(self.name)
 
     def check(self,tick):
@@ -503,6 +528,9 @@ class SHORT_MOVING_STOPER(SHORT_STOPER):#空头移动止损
         if tick.price < self.tlow:
             self.tlow = tick.price
             nstop = self.stop0 - (self.base_line - tick.price) / self.tstep * self.vstep    
+            m_nstop = tick.price + self.cmax_drawdown
+            if m_nstop < nstop:
+                nstop = m_nstop
             #nstop = self.stop0 + (tick.price - self.base_line) / self.tstep * self.vstep    #不能这样，因为tick.price<self.base_line,所以会有四舍五入问题，-0.12舍入成-1
             if nstop < self.get_cur_stop():
                 logging.info(u'移动平仓位置，新低点=%s,原平仓点=%s,现平仓点=%s,cur_price=%s,self.base_line=%s,stop0=%s' % (tick.price,self.get_cur_stop(),nstop,tick.price,self.base_line,self.stop0))

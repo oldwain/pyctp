@@ -11,16 +11,8 @@ Agent的目的是合并行情和交易API到一个类中进行处理
     正常都是根据行情决策
 
 todo:
-    1. 打通trade环节
-    2. 前期数据的衔接(1分钟,5/30)
-    3. 行情数据的整理
-    4. trader桩的建立,根据trade桩模拟交易
-    5. 中间环境的恢复,如持仓. 
-       断点间的撤单--可延后. 要求撤单/委托动作都撤销后才能重起程序
-    6. 完全模拟交易
-    7. 有人值守实盘
-
-    8. 生产环境必须考虑多个行情接入端, 有可能会出现延时情况.
+    0. 生产环境必须考虑多个行情接入端, 有可能会出现延时情况.
+    #1. 当日风险控制，当日交易次数限制以及交易损失限制
 
 后续工作
  B.1. 合约的自动匹配
@@ -616,6 +608,8 @@ class c_instrument(object):
                 logging.warning(u'策略针对合约%s不在盯盘列表中' % (item.name,))
                 continue
             objs[item.name].max_volume = item.max_volume #
+            objs[item.name].max_vtimes = item.max_vtimes #
+            objs[item.name].max_lost = item.max_lost #            
             #objs[item.name].strategy = dict([(ss.get_name(),ss) for ss in item[1:]])
             objs[item.name].strategy = dict([(ss.name,ss) for ss in item.strategys])
             objs[item.name].initialize_positions()
@@ -636,6 +630,10 @@ class c_instrument(object):
         self.position_detail = {}   #在Agent的ontrade中设定, 并需要在resume中恢复
         #设定的最大持仓手数
         self.max_volume = 1
+        self.max_vtimes = 1  #最大的手次，如一次开2手，则为2手次
+        self.max_lost = 0
+        self.cur_vtimes = 0
+        self.cur_profit = 0 #当前收益
 
         #应用策略 开仓函数名 ==> STRATEGY对象)
         self.strategy = {}
@@ -658,6 +656,12 @@ class c_instrument(object):
         self.position_detail = dict([(ss.name,strategy.Position(self,ss)) for ss in self.strategy.values()])
 
     def calc_remained_volume(self):   #计算剩余的可开仓量
+        if self.cur_vtimes >= self.max_vtimes:    #超过日开仓次数限制
+            logging.info(u'超过日开仓手次限制:%s|%s' % (self.cur_vtimes,self.max_vtimes))
+            return 0
+        if self.cur_profit <= -self.max_lost:   #超过日最大损失
+            logging.info(u'超过日开损失限制:%s|%s' % (self.cur_profit,self.max_lost))
+            return 0
         locked_volume = 0
         opened_volume = 0
         for position in self.position_detail.values():
@@ -695,6 +699,23 @@ class c_instrument(object):
     def get_order(self,vtime):
         #print self.t2order
         return self.t2order[vtime]
+
+    def day_switch(self):
+        self.cur_vtimes = 0
+        self.cur_profit = 0
+        for ss in self.strategy.values():   #重新初始化opener
+            ss.opener = ss.opener_class()
+        
+    def add_vtimes(self,v):
+        self.cur_vtimes += v
+
+    def add_profit(self,profit):
+        '''
+            这个必须在平仓的时候计算，但是因为可能是一次指令多次回报(包括开仓和平仓)
+        '''
+        self.cur_profit += profit
+        logging.info(u'当前利润:%s' % (self.cur_profit,))
+
 
 class AbsAgent(object):
     ''' 抽取与交易无关的功能，便于单独测试
@@ -1123,7 +1144,8 @@ class Agent(AbsAgent):
                         logging.info(u'平仓信号,time=%s,inst=%s,cur_price=%s' % (ctick.time,cur_inst.name,ctick.price))
                         signals.append(BaseObject(instrument=cur_inst,
                                 volume=order.opened_volume,
-                                direction = dir_py2ctp(order.get_stop_direction()),
+                                #direction = dir_py2ctp(order.get_stop_direction()),
+                                direction = order.get_stop_direction(),
                                 base_price = mysignal[1],
                                 #target_price=order.stoper.calc_target_price(mysignal[1],cur_inst.tick_base),
                                 target_price=order.calc_stop_price(mysignal[1],cur_inst.tick_base),
@@ -1268,7 +1290,7 @@ class Agent(AbsAgent):
                 self.put_command(self.get_tick()+order.source_order.get_stop_valid_length()+1,lambda : order.source_order.release_close_lock())
                 logging.info(u'A_MC_D:设置平仓撤单完成,cur_tick=%s,触发点=%s' % (self.get_tick(),self.get_tick()+order.source_order.get_stop_valid_length()))
                 #logging.info(u'发出平仓指令，cur_tick=%s,释放锁的时间是=%s' % (self.get_tick(),self.get_tick()+order.source_order.get_stop_valid_length()+1))
-                logging.info(u'发出平仓指令，cur_tick=%s,释放锁的时间是=%s' % (self.get_tick(),self.get_tick()+order.source_order.get_stop_valid_length()+1))
+                logging.info(u'发出平仓指令，cur_tick=%s,price=%s,释放锁的时间是=%s' % (self.get_tick(),command.price,self.get_tick()+order.source_order.get_stop_valid_length()+1))
                 self.close_position(command)
 
 
@@ -1412,8 +1434,7 @@ class Agent(AbsAgent):
         self.scur_day = scur_day
         self.actions = []
         for cur_inst in self.instruments.values():
-            for ss in cur_inst.strategy.values():
-                ss.opener = ss.opener_class()
+            cur_inst.day_switch()
 
     ###交易
 
@@ -1433,9 +1454,11 @@ class Agent(AbsAgent):
         if myorder.action_type == XOPEN:#开仓, 也可用pTrade.OffsetFlag判断
             is_completed = myorder.on_trade(price=int(strade.Price*10+0.1),volume=strade.Volume,trade_time=strade.TradeTime)
             logging.info(u'A_RT31,开仓回报');
+            cur_inst.add_vtimes(strade.Volume)
         else:
             myorder.source_order.on_close(price=int(strade.Price*10+0.1),volume=strade.Volume,trade_time=strade.TradeTime)
             logging.info(u'A_RT32,平仓回报,price=%s,time=%s' % (strade.Price,strade.TradeTime));
+            cur_inst.add_profit(myorder.source_order.get_profit())
         self.save_state()
         ##查询可用资金
         #print 'fetch_trading_account'

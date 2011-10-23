@@ -187,6 +187,7 @@ def ATR(data):
     data.tr1 = tr(data.m1[ICLOSE],data.m1[IHIGH],data.m1[ILOW])
     data.atr1 = atr(data.tr1,20)
     data.xatr1 = xatr(data.atr1,data.m1[ICLOSE])
+    data.mxatr1 = ma(data.xatr1,13)
     #data.tr3 = tr(data.m3[ICLOSE],data.m3[IHIGH],data.m3[ILOW])
     #data.atr3 = atr(data.tr3,20)
     #data.xatr3 = xatr(data.atr3,data.m3[ICLOSE])
@@ -215,6 +216,9 @@ def ATR1(data):
         atr1(data.tr1,data.atr1,20)
         data.xatr1.append(0)
         xatr1(data.atr1,data.m1[ICLOSE],data.xatr1)
+        data.mxatr1.append(0)
+        ma1(data.xatr1,13,data.mxatr1)
+        
     #if len(data.m5[ICLOSE]) > len(data.tr5):    #5分钟数据
     #    data.tr5.append(0)
     #    tr1(data.m5[ICLOSE],data.m5[IHIGH],data.m5[ILOW],data.tr5)
@@ -236,25 +240,35 @@ def ATR1(data):
         atr1(data.trd1,data.atrd1,20)
         data.xatrd1.append(0)
         xatr1(data.atrd1,data.d1[ICLOSE],data.xatrd1)
-    
+
+
 def STREND(data):
     '''
         计算趋势
     '''
-    #data.ma30_120 = ma(data.m30[ICLOSE],120)
-    #data.t120 = strend2(data.ma30_120)
-    pass
+    data.ma30_120 = ma(data.m30[ICLOSE],120)
+    data.t120 = strend2(data.ma30_120)
+    data.ma15_60 = ma(data.m15[ICLOSE],60)
+    data.r60 = strend2(data.ma15_60)
+
+    #pass
 
 def STREND1(data):
     '''
         动态计算t120的最新值
     '''
-    #if len(data.m30[ICLOSE]) > len(data.ma30_120):  #需要计算
-    #    data.ma30_120.append(0)
-    #    data.t120.append(0)
-    #    ma1(data.m30[ICLOSE],120,data.ma30_120)
-    #    strend2_1(data.ma30_120,data.t120)
-    pass
+    if len(data.m30[ICLOSE]) > len(data.ma30_120):  #需要计算
+        data.ma30_120.append(0)
+        data.t120.append(0)
+        ma1(data.m30[ICLOSE],120,data.ma30_120)
+        strend2_1(data.ma30_120,data.t120)
+    if len(data.m15[ICLOSE]) > len(data.ma15_60):  #需要计算
+        data.ma15_60.append(0)
+        data.r60.append(0)
+        ma1(data.m15[ICLOSE],60,data.ma15_60)
+        strend2_1(data.ma15_60,data.r60)
+
+    #pass
 
 def MA(data):
     '''
