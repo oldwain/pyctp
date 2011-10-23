@@ -22,6 +22,7 @@ import logging
 import hreader
 import agent
 import config
+import strategy
 
 import UserApiStruct as ustruct
 import UserApiType as utype
@@ -54,6 +55,12 @@ class TraderMock(object):
             self.available -= order.LimitPrice * 300 * 0.17
         else:
             self.available += order.LimitPrice * 300 * 0.17
+        fl_open = strategy.MAX_OPEN_OVERFLOW * 0.2
+        fl_close = strategy.MAX_CLOSE_OVERFLOW * 0.2
+        if order.CombOffsetFlag == utype.THOST_FTDC_OF_Open:
+            trade.Price += -fl_open if order.Direction == utype.THOST_FTDC_D_Buy else fl_open
+        else:
+            trade.Price += -fl_close if order.Direction == utype.THOST_FTDC_D_Buy else fl_close
         self.myagent.rtn_trade(trade)
 
     def ReqOrderAction(self, corder, request_id):
@@ -198,9 +205,9 @@ import hreader
 
 ctp_mock.log_config()
 
-preday = 2011018
-tday = 20111019
-instrument = 'IF1111'
+preday = 20110928
+tday = 20110929
+instrument = 'IF1110'
 myagent = ctp_mock.create_agent_with_mocktrader(instrument,-1)    #不需要tday的当日数据
 myagent.instruments[instrument].t2order = base.t2order_if
 myagent.scur_day = preday
@@ -214,11 +221,10 @@ myagent.resume()
 ctp_mock.run_ticks(ticks,myagent)
 
 ##推进
-tday = 20111021
+tday = 20110929
 myagent.day_switch(tday)
 ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
 ctp_mock.run_ticks(ticks,myagent)
-
 
 tday = 20110901
 myagent.day_switch(tday)
