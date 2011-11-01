@@ -69,7 +69,7 @@ class Order(object):
         #self.volume = self.opened_volume    #已经开始平仓，必然没有待成交的目标 #这个假设可能有问题??
         self.volume -= volume
         self.trade_detail.append((price,-volume,trade_time))
-        logging.info('on close')
+        logging.info(u'O_CLS:on close,opened_volume=%s,volume=%s,trade_time=%s' % (self.opened_volume,volume,trade_time))
         self.position.re_calc()
 
     def on_cancel(self):    #已经撤单
