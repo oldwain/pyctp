@@ -72,7 +72,8 @@ class TraderMock(object):
                     OrderRef = corder.OrderRef,
                     OrderStatus = utype.THOST_FTDC_OST_Canceled,
                 )
-        self.myagent.rtn_order(rorder)
+        #self.myagent.rtn_order(rorder)
+        self.myagent.err_order_action(rorder.OrderRef,rorder.InstrumentID,u'26',u'测试撤单--报单已成交')
 
     def ReqQryTradingAccount(self,req,req_id=0):
         logging.info(u'查询帐户余额')
@@ -221,7 +222,7 @@ myagent.resume()
 ctp_mock.run_ticks(ticks,myagent)
 
 ##推进
-tday = 20111026
+tday = 20111025
 myagent.day_switch(tday)
 ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
 ctp_mock.run_ticks(ticks,myagent)
