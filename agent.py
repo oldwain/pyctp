@@ -1494,9 +1494,15 @@ class Agent(AbsAgent):
     def err_order_action(self,order_ref,instrument_id,error_id,error_msg):
         '''
             ctp/交易所撤单错误回报，不区分ctp和交易所
-            不处理，可记录
+            必须处理，如果已成交，撤单后必然到达这个位置
         '''
-        pass    #可能撤单已经成交
+        logging.info(u'撤单时已成交，error_id=%s,error_msg=%s' %(error_id,error_msg))
+        myorder = self.ref2order[int(order_ref)]
+        if myorder.action_type == XOPEN and int(error_id) == 26:
+            #开仓指令cancel时需要处理，平仓指令cancel时不需要处理
+            logging.info(u'撤销开仓单')
+            myorder.on_cancel()
+        
     
     ###辅助   
     def rsp_qry_position(self,position):
