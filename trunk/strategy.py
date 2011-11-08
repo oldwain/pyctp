@@ -602,7 +602,7 @@ class LONG_LAST_STOPER(LONG_STOPER):
     '''
         时间平仓,多
     '''
-    def __init__(self,data,bline,ttrace=240,tend=266,vbegin=0.02,vmm=30):
+    def __init__(self,data,bline,ttrace=240,tend=266,vbegin=0.01,vmm=30):
         '''
            data:行情对象
            bline: 价格基线
@@ -630,23 +630,27 @@ class LONG_LAST_STOPER(LONG_STOPER):
             必须返回(平仓标志, 基准价,stop变化标志)
             基准价为0则为当前价
         '''
-        if tick.iorder < self.ttrace:
+        stop_changed = False
+        if tick.iorder < self.ttrace + 1:
             return (False,tick.price,False)
-        if tick.price < self.get_cur_stop():# or tick.iorder >= self.tend:
-            return (True,tick.price,False)
+        if tick.price < self.get_cur_stop() or tick.iorder >= self.tend-1:
+            #return (True,tick.price,False)
+            return (True,self.get_cur_stop(),False)
         if tick.switch_min:
             if tick.iorder-1 == self.ttrace:
                 self.htrace = self.calc_htrace(self.data)
             self.set_cur_stop(self.htrace -  (self.vmax_stop - (tick.iorder-self.ttrace+1) * self.vstep) 
-                    if tick.iorder-1 >= self.ttrace else 0
+                    #if tick.iorder-1 >= self.ttrace else 0
                 )
+            stop_changed = True
             print tick.iorder,self.data.siorder[-1],self.ttrace,self.htrace,self.vmax_stop,self.vstep,self.get_cur_stop(),(tick.iorder-1-self.ttrace+1) * self.vstep
         if tick.price > self.htrace:
             self.htrace = tick.price
             self.set_cur_stop(self.htrace -  (self.vmax_stop - (tick.iorder-self.ttrace+1) * self.vstep) 
-                    if tick.iorder-1 >= self.ttrace else 0
+                    #if tick.iorder-1 >= self.ttrace else 0
                 )
-        return (False,self.get_base_line(),False)
+            stop_changed = True
+        return (False,self.get_base_line(),stop_changed)
 
     def calc_htrace(self,data):
         if data.siorder[-1] < self.ttrace:
@@ -661,7 +665,73 @@ class LONG_LAST_STOPER(LONG_STOPER):
                 return 0
             return max(data.shigh[i-30+1:i+1])
 
-if_llast_stoper = LONG_LAST_STOPER
+if_llast_stoper = fcustom(LONG_LAST_STOPER,ttrace=240,tend=266,vbegin=0.02,vmm=30)
+
+class SHORT_LAST_STOPER(SHORT_STOPER):
+    '''
+        时间平仓,多
+    '''
+    def __init__(self,data,bline,ttrace=240,tend=266,vbegin=0.01,vmm=30):
+        '''
+           data:行情对象
+           bline: 价格基线
+           ttrace: 开始线 iorder
+           tend: 中止线 iorder
+           vbegin:止损比例
+        '''
+        SHORT_STOPER.__init__(self,data,bline)
+        self.ttrace = ttrace
+        self.tend = tend
+        self.vbegin = vbegin
+        self.vmm = vmm
+        opend = data.cur_day.vopen
+        self.vmax_stop = opend * vbegin
+        self.vstep = self.vmax_stop / (tend - ttrace)
+        self.ltrace = self.calc_ltrace(data)
+        self.set_cur_stop(self.ltrace +  (self.vmax_stop - (data.siorder[-1]+1-self.ttrace+1) * self.vstep) #+1成为当前iorder
+                if data.siorder[-1] >= ttrace else 99999999
+            )
+        self.name = u'多头直线离场'
+        logging.info(self.name)
+
+    def check(self,tick):
+        '''
+            必须返回(平仓标志, 基准价,stop变化标志)
+            基准价为0则为当前价
+        '''
+        if tick.iorder < self.ttrace + 1:
+            return (False,tick.price,False)
+        if tick.price > self.get_cur_stop() or tick.iorder >= self.tend-1:
+            return (True,tick.price,False)
+        if tick.switch_min:
+            if tick.iorder-1 == self.ttrace:
+                self.ltrace = self.calc_ltrace(self.data)
+            self.set_cur_stop(self.ltrace +  (self.vmax_stop - (tick.iorder-self.ttrace+1) * self.vstep)
+                    #if tick.iorder-1 >= self.ttrace else 99999999
+                )
+            print tick.iorder,self.data.siorder[-1],self.ttrace,self.ltrace,self.vmax_stop,self.vstep,self.get_cur_stop(),(tick.iorder-1-self.ttrace+1) * self.vstep
+        if tick.price < self.ltrace:
+            self.ltrace = tick.price
+            self.set_cur_stop(self.ltrace +  (self.vmax_stop - (tick.iorder-self.ttrace+1) * self.vstep)
+                    #if tick.iorder-1 >= self.ttrace else 99999999
+                )
+            print tick.iorder,self.data.siorder[-1],self.ttrace,self.ltrace,self.vmax_stop,self.vstep,self.get_cur_stop(),(tick.iorder-1-self.ttrace+1) * self.vstep
+        return (False,self.get_base_line(),False)
+
+    def calc_ltrace(self,data):
+        if data.siorder[-1] < self.ttrace:
+            return 99999999
+        elif data.siorder[-1] == self.ttrace:#可以合入下一判断
+            return min(data.slow[-self.vmm:])
+        elif data.siorder[-1] > self.ttrace:
+            i = len(data.siorder) - 1
+            while data.siorder[i] > self.ttrace and i>0:
+                i -= 1
+            if i < 0:   #不应当出现
+                return 99999999
+            return min(data.slow[i-30+1:i+1])
+
+if_slast_stoper = fcustom(SHORT_LAST_STOPER,ttrace=250,tend=266,vbegin=0.02,vmm=30)
 
 
 class STRATEGY(object):#策略基类, 单纯包装
