@@ -643,12 +643,14 @@ class LONG_LAST_STOPER(LONG_STOPER):
                     #if tick.iorder-1 >= self.ttrace else 0
                 )
             stop_changed = True
-            print tick.iorder,self.data.siorder[-1],self.ttrace,self.htrace,self.vmax_stop,self.vstep,self.get_cur_stop(),(tick.iorder-1-self.ttrace+1) * self.vstep
+            logging.info(u'LLS:C1 止损位变化:%s' % (self.get_cur_stop(),))
+            #print tick.iorder,self.data.siorder[-1],self.ttrace,self.htrace,self.vmax_stop,self.vstep,self.get_cur_stop(),(tick.iorder-1-self.ttrace+1) * self.vstep
         if tick.price > self.htrace:
             self.htrace = tick.price
             self.set_cur_stop(self.htrace -  (self.vmax_stop - (tick.iorder-self.ttrace+1) * self.vstep) 
                     #if tick.iorder-1 >= self.ttrace else 0
                 )
+            logging.info(u'LLS:C2 止损位变化:%s' % (self.get_cur_stop(),))
             stop_changed = True
         return (False,self.get_base_line(),stop_changed)
 
@@ -709,13 +711,15 @@ class SHORT_LAST_STOPER(SHORT_STOPER):
             self.set_cur_stop(self.ltrace +  (self.vmax_stop - (tick.iorder-self.ttrace+1) * self.vstep)
                     #if tick.iorder-1 >= self.ttrace else 99999999
                 )
-            print tick.iorder,self.data.siorder[-1],self.ttrace,self.ltrace,self.vmax_stop,self.vstep,self.get_cur_stop(),(tick.iorder-1-self.ttrace+1) * self.vstep
+            #print tick.iorder,self.data.siorder[-1],self.ttrace,self.ltrace,self.vmax_stop,self.vstep,self.get_cur_stop(),(tick.iorder-1-self.ttrace+1) * self.vstep
+            logging.info(u'SLS:C1 止损位变化:%s' % (self.get_cur_stop(),))
         if tick.price < self.ltrace:
             self.ltrace = tick.price
             self.set_cur_stop(self.ltrace +  (self.vmax_stop - (tick.iorder-self.ttrace+1) * self.vstep)
                     #if tick.iorder-1 >= self.ttrace else 99999999
                 )
-            print tick.iorder,self.data.siorder[-1],self.ttrace,self.ltrace,self.vmax_stop,self.vstep,self.get_cur_stop(),(tick.iorder-1-self.ttrace+1) * self.vstep
+            logging.info(u'SLS:C2 止损位变化:%s' % (self.get_cur_stop(),))
+            #print tick.iorder,self.data.siorder[-1],self.ttrace,self.ltrace,self.vmax_stop,self.vstep,self.get_cur_stop(),(tick.iorder-1-self.ttrace+1) * self.vstep
         return (False,self.get_base_line(),False)
 
     def calc_ltrace(self,data):
