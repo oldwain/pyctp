@@ -693,7 +693,7 @@ class SHORT_LAST_STOPER(SHORT_STOPER):
         self.set_cur_stop(self.ltrace +  (self.vmax_stop - (data.siorder[-1]+1-self.ttrace+1) * self.vstep) #+1成为当前iorder
                 if data.siorder[-1] >= ttrace else 99999999
             )
-        self.name = u'多头直线离场'
+        self.name = u'空头直线离场'
         logging.info(self.name)
 
     def check(self,tick):
