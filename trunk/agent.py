@@ -133,7 +133,7 @@ import threading
 import bisect
 
 from base import *
-from dac import ATR,ATR1,STREND,STREND1,MA,MA1
+from dac import ATR,ATR1,STREND,STREND1,MA,MA1,MACD,MACD1
 import hreader
 
 import UserApiStruct as ustruct
@@ -805,6 +805,7 @@ class Agent(AbsAgent):
                 BaseObject(sfunc=NFUNC,func1=hreader.time_period_switch),    #时间切换函数
                 BaseObject(sfunc=ATR,func1=ATR1),
                 BaseObject(sfunc=MA,func1=MA1),
+                BaseObject(sfunc=MACD,func1=MACD1),
                 BaseObject(sfunc=STREND,func1=STREND1),
             )
 
@@ -1414,6 +1415,7 @@ class Agent(AbsAgent):
                 cur_position = cur_inst.position_detail[order.strategy_name]
                 xorder = strategy.Order(cur_position,order.base_price,order.target_price,order.mytime,order.action_type)
                 xorder.volume = xorder.opened_volume = order.volume
+                xorder.trade_detail.append((order.base_price,order.volume,order.mytime))
                 #xorder.stoper = order.stoper
                 xorder.stopers = order.stopers
                 xorder.set_stopers_data(cur_inst.data)

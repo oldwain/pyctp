@@ -11,6 +11,8 @@
 
 
 CBASE = 1000 #整数运算的放大倍数
+FBASE = 10 #整数运算的放大倍数2
+
 
 def cexpma(source,n): 
     ''' 计算cexpma序列
@@ -77,6 +79,27 @@ def atr1(ltr,target,length=20):
     cexpma1(ltr,length,target)
     return target[-1]
  
+def cmacd(source,ifast=12,islow=26,idiff=9):
+    source = [s* FBASE for s in source]
+    sfast = cexpma(source,ifast)
+    sslow = cexpma(source,islow)
+    sdiff = [sf - ss for sf,ss in zip(sfast,sslow)]
+    sdea = cexpma(sdiff,idiff)
+    return sfast,sslow,sdiff,sdea
+
+def cmacd1(source,target_fast,target_slow,target_dea,ifast=12,islow=26,idiff=9):
+    if len(source)<1:
+        return 0
+    assert len(source) == len(target_fast),u'源序列与fast目标序列长度不相等,%s:%s' % (len(source),len(target_fast))
+    assert len(source) == len(target_slow),u'源序列与slow目标序列长度不相等,%s:%s' % (len(source),len(target_slow))
+    assert len(source) == len(target_dea),u'源序列与dea目标序列长度不相等,%s:%s' % (len(source),len(target_dea))
+    source = source[:-1] + [source[-1]*FBASE]  #这里是为了加快速度，因为知道cexpma1中只用到了source[-1], *10是保证一致性
+    cexpma1(source,ifast,target_fast)
+    cexpma1(source,islow,target_slow)
+    #cexpma1(target_fast-target_slow,idiff,target_dea)    #加快速度
+    cexpma1(target_fast[:-1] + [target_fast[-1]-target_slow[-1]],idiff,target_dea)    #加快速度
+    return target_fast[-1],target_slow[-1],target_dea[-1]
+
 def xatr(latr,sclose):
     return [ia * CBASE / ic for ia,ic in zip(latr,sclose)]
 
@@ -317,4 +340,19 @@ def MA1(data):
     #print u'after:收盘序列长度:%s,ma5序列长度:%s' % (len(data.sclose),len(data.ma_5))
     assert len(data.sclose) == len(data.ma_5),u'sclose序列和ma_5序列长度不同 len(data.sclose)=%s,len(data.ma5)=%s' % (len(data.sclose),len(data.ma_5))
 
+def MACD(data):
+    '''
+        序列计算1分钟MACD
+    '''
+    data.sfast,data.sslow,data.sdiff,data.sdea = cmacd(data.sclose)
+
+def MACD1(data):
+    '''
+        动态计算1分钟MACD
+    '''
+    data.sfast.append(0)
+    data.sslow.append(0)    
+    data.sdea.append(0)
+    cmacd1(data.sclose,data.sfast,data.sslow,data.sdea)
+    data.sdiff.append(data.sfast[-1] - data.sslow[-1])    
 

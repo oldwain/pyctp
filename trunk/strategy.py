@@ -16,7 +16,7 @@ import UserApiType as utype
 
 
 from base import *
-
+from dac import CBASE
 
 ##策略类
 #基类提供接口
@@ -85,6 +85,8 @@ class Order(object):
         if not self.is_closed():    #未完全平仓的，返回0
             return 0
         rp = sum([td[0]*td[1] for td in self.trade_detail])
+        for td in self.trade_detail:
+            logging.info(u'交易明细：%s' % self.trade_detail)
         if self.position.strategy.direction==LONG:
             return -rp
         return rp
@@ -390,9 +392,10 @@ class DATR_LONG_STOPER(LONG_STOPER):#日ATR多头止损
         self.thigh = bline
         self.ticks = 0
         self.name = u'多头日ATR止损,初始止损=%s,保本=%s,最大回撤=%s' % (rbase,rkeeper,rdrawdown)
-        self.max_drawdown = int(data.atrd1[-1] * rdrawdown / XBASE + 0.5)
-        self.keeper = int(data.atrd1[-1] * rkeeper / XBASE + 0.5)
-        self.set_cur_stop(bline - int(data.atrd1[-1] * rbase / XBASE + 0.5))
+        self.max_drawdown = int(data.atrd1[-1] * rdrawdown / CBASE + 0.5)
+        self.keeper = int(data.atrd1[-1] * rkeeper / CBASE + 0.5)
+        self.set_cur_stop(bline - int(data.atrd1[-1] * rbase / CBASE + 0.5))
+        logging.info(u'设定止损: max_drawdown=%s,keeper=%s,cur_stop=%s' % (self.max_drawdown,self.keeper,self.get_cur_stop()))
 
     def check(self,tick):
         '''
@@ -419,9 +422,9 @@ class DATR_SHORT_STOPER(SHORT_STOPER):#日ATR空头止损
         self.tlow = bline
         self.itime = len(self.data.sclose)  #time的索引，用于计算耗时
         self.name = u'空头日ATR止损,初始止损=%s,保本=%s,最大回撤=%s' % (rbase,rkeeper,rdrawdown)
-        self.max_drawdown = int(data.atrd1[-1] * rdrawdown / XBASE + 0.5)
-        self.keeper = int(data.atrd1[-1] * rkeeper / XBASE + 0.5)
-        self.set_cur_stop(bline + int(data.atrd1[-1] * rbase / XBASE + 0.5))
+        self.max_drawdown = int(data.atrd1[-1] * rdrawdown / CBASE + 0.5)
+        self.keeper = int(data.atrd1[-1] * rkeeper / CBASE + 0.5)
+        self.set_cur_stop(bline + int(data.atrd1[-1] * rbase / CBASE + 0.5))
 
     def check(self,tick):
         '''
