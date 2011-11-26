@@ -229,10 +229,12 @@ def parse_state(strategy_cfg,instruments,name='state.ini',root='State'):
             #order.stoper.load_parameters(cfg.get(soo,'stoper_parameters').strip())
             sps = eval(cfg.get(soo,'stopers'))
             order.stopers = []
+            print sps
             for stoper,sparameter in sps:
-                stoper = strategy_cfg.smodule.__dict__[stoper.strip()](cur_inst.data,0)
-                stoper.load_parameters(sparameter)
-                order.stopers.append(stoper)
+                print stoper.strip()
+                xstoper = strategy_cfg.smodule.__dict__[stoper.strip()](cur_inst.data,0)
+                xstoper.load_parameters(sparameter)
+                order.stopers.append(xstoper)
             #state.mys = cfg.get(soo,'stoper_parameters').strip()   #调试用
             #print cfg.get(soo,'stoper_parameters').strip()
             order.base_price = int(cfg.get(soo,'base_price').strip())
@@ -307,7 +309,7 @@ def save_state(state,name='state.ini',root='State'):
             #cfg.set(mystr,'opener_parameters',order.get_opener().save_parameters())
             #cfg.set(mystr,'stoper',"('%s',%s)" % (base.type_name(order.get_stoper()),order.stoper.save_parameters()))
             ss =[ "('%s',%s)" % (base.type_name(stoper),stoper.save_parameters()) for stoper in order.get_stopers()]
-            cfg.set(mystr,'stopers',','.join(ss))
+            cfg.set(mystr,'stopers',','.join(ss)+',')
             #cfg.set(mystr,'stoper',base.type_name(order.get_stoper()))
             #cfg.set(mystr,'stoper_parameters',order.stoper.save_parameters())
             if order.target_price>0:
