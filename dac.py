@@ -32,7 +32,7 @@ def cexpma(source,n):
     return rev
 
 
-def cexpma1(source,n,target): 
+def cexpma1_old(source,n,target): 
     ''' 计算最新值
         其中target[:-2]是已经计算的结果
         用于整数的source,有四舍五入因子(n+1)/2. 因此不能传入浮点数，会因为该因子而导致数据变化
@@ -42,6 +42,15 @@ def cexpma1(source,n,target):
         return 0  
     target[-1] = (source[-1]*2 + target[-2] *(n-1) + (n+1)/2)/(n+1) 
     return target[-1]
+
+def cexpma1(slast,n,target2): 
+    ''' 计算最新值
+        slast是source最新值
+        其中target[:-2]是已经计算的结果
+        用于整数的source,有四舍五入因子(n+1)/2. 因此不能传入浮点数，会因为该因子而导致数据变化
+    '''
+    return (slast*2 + target2 *(n-1) + (n+1)/2)/(n+1) 
+
 
 def tr(sclose,shigh,slow):
     ''' 真实波幅. 结果被放大CBASE倍
@@ -73,10 +82,10 @@ def atr(ltr,length=20):
     return cexpma(ltr,length)
 
 def atr1(ltr,target,length=20):
-    if len(ltr)<1:
+    if len(ltr)<2:
         return 0
     assert len(ltr) == len(target),u'源序列与目标序列长度不相等,%s:%s' % (len(ltr),len(target))
-    cexpma1(ltr,length,target)
+    target[-1] = cexpma1(ltr[-1],length,target[-2])
     return target[-1]
  
 def cmacd(source,ifast=12,islow=26,idiff=9):
@@ -93,11 +102,10 @@ def cmacd1(source,target_fast,target_slow,target_dea,ifast=12,islow=26,idiff=9):
     assert len(source) == len(target_fast),u'源序列与fast目标序列长度不相等,%s:%s' % (len(source),len(target_fast))
     assert len(source) == len(target_slow),u'源序列与slow目标序列长度不相等,%s:%s' % (len(source),len(target_slow))
     assert len(source) == len(target_dea),u'源序列与dea目标序列长度不相等,%s:%s' % (len(source),len(target_dea))
-    source = source[:-1] + [source[-1]*FBASE]  #这里是为了加快速度，因为知道cexpma1中只用到了source[-1], *10是保证一致性
-    cexpma1(source,ifast,target_fast)
-    cexpma1(source,islow,target_slow)
-    #cexpma1(target_fast-target_slow,idiff,target_dea)    #加快速度
-    cexpma1(target_fast[:-1] + [target_fast[-1]-target_slow[-1]],idiff,target_dea)    #加快速度
+    
+    target_fast[-1] = cexpma1(source[-1]*FBASE,ifast,target_fast[-2])
+    target_slow[-1] = cexpma1(source[-1]*FBASE,islow,target_slow[-2])
+    target_dea[-1] = cexpma1(target_fast[-1]-target_slow[-1],idiff,target_dea[-2])
     return target_fast[-1],target_slow[-1],target_dea[-1]
 
 def xatr(latr,sclose):
@@ -345,6 +353,9 @@ def MACD(data):
         序列计算1分钟MACD
     '''
     data.sfast,data.sslow,data.sdiff,data.sdea = cmacd(data.sclose)
+    data.macd = [sdi-sde for sdi,sde in zip(data.sdiff,data.sdea)]
+    data.mmacd = ma(data.macd,3)
+    data.s1 = strend2(data.mmacd)
 
 def MACD1(data):
     '''
@@ -354,5 +365,9 @@ def MACD1(data):
     data.sslow.append(0)    
     data.sdea.append(0)
     cmacd1(data.sclose,data.sfast,data.sslow,data.sdea)
-    data.sdiff.append(data.sfast[-1] - data.sslow[-1])    
-
+    data.sdiff.append(data.sfast[-1] - data.sslow[-1])
+    data.macd.append(data.sdiff[-1] - data.sdea[-1])
+    data.mmacd.append(0)
+    ma1(data.macd,3,data.mmacd)
+    data.s1.append(0)
+    strend2_1(data.mmacd,data.s1)
