@@ -9,8 +9,8 @@
     序列函数/动态函数中必须妥善处理输入序列比较短或为空的情况
 '''
 
-
-CBASE = 1000 #整数运算的放大倍数
+XBASE = 100  #整数运算的放大倍数
+CBASE = XBASE * XBASE #XATR倍数
 FBASE = 10 #整数运算的放大倍数2
 
 
@@ -53,7 +53,7 @@ def cexpma1(slast,n,target2):
 
 
 def tr(sclose,shigh,slow):
-    ''' 真实波幅. 结果被放大CBASE倍
+    ''' 真实波幅. 结果被放大XBASE倍
         sclose = rollx(sclose)
         shl = np.abs(shigh - slow)
         shc = np.abs(shigh - sclose)
@@ -63,18 +63,18 @@ def tr(sclose,shigh,slow):
     if(len(sclose) < 1):
         return []
     sclose = [sclose[0]] + sclose[:-1]
-    shl = [abs(sh-sl) * CBASE for sh,sl in zip(shigh,slow)]
-    shc = [abs(sh-sc) * CBASE for sh,sc in zip(shigh,sclose)]
-    slc = [abs(sl-sc) * CBASE for sl,sc in zip(slow,sclose)]
+    shl = [abs(sh-sl) * XBASE for sh,sl in zip(shigh,slow)]
+    shc = [abs(sh-sc) * XBASE for sh,sc in zip(shigh,sclose)]
+    slc = [abs(sl-sc) * XBASE for sl,sc in zip(slow,sclose)]
     return [max(hl,hc,lc) for hl,hc,lc in zip(shl,shc,slc)]
 
 def tr1(sclose,shigh,slow,target):
     assert len(sclose) == len(target),u'源序列与目标序列长度不相等,%s:%s' % (len(sclose),len(target))
     if(len(sclose) < 2):
         return 0
-    hl = abs(shigh[-1] - slow[-1]) * CBASE
-    hc = abs(shigh[-1] - sclose[-2]) * CBASE
-    lc = abs(slow[-1] - sclose[-2]) * CBASE
+    hl = abs(shigh[-1] - slow[-1]) * XBASE
+    hc = abs(shigh[-1] - sclose[-2]) * XBASE
+    lc = abs(slow[-1] - sclose[-2]) * XBASE
     target[-1] = max(hl,hc,lc)
     return target[-1]
 
@@ -279,8 +279,8 @@ def STREND(data):
     '''
     data.ma30_120 = ma(data.m30[ICLOSE],120)
     data.t120 = strend2(data.ma30_120)
-    data.ma15_60 = ma(data.m15[ICLOSE],60)
-    data.r60 = strend2(data.ma15_60)
+    data.ma15_20 = ma(data.m15[ICLOSE],20)
+    data.r20 = strend2(data.ma15_20)
 
     #pass
 
@@ -293,11 +293,11 @@ def STREND1(data):
         data.t120.append(0)
         ma1(data.m30[ICLOSE],120,data.ma30_120)
         strend2_1(data.ma30_120,data.t120)
-    if len(data.m15[ICLOSE]) > len(data.ma15_60):  #需要计算
-        data.ma15_60.append(0)
-        data.r60.append(0)
-        ma1(data.m15[ICLOSE],60,data.ma15_60)
-        strend2_1(data.ma15_60,data.r60)
+    if len(data.m15[ICLOSE]) > len(data.ma15_20):  #需要计算
+        data.ma15_20.append(0)
+        data.r20.append(0)
+        ma1(data.m15[ICLOSE],20,data.ma15_20)
+        strend2_1(data.ma15_20,data.r20)
 
     #pass
 

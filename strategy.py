@@ -18,6 +18,7 @@ import UserApiType as utype
 from base import *
 from dac import CBASE
 
+
 ##策略类
 #基类提供接口
     
@@ -453,7 +454,7 @@ class LONG_MOVING_STOPER(LONG_STOPER):
     '''
         简化的移动跟踪止损, 达到快速提升止损和和逐步放开盈利端的平衡
     '''
-    def __init__(self,data,bline,lost_base=100,max_drawdown=360,pmax_drawdown=0.011,tstep=40,vstep=20):
+    def __init__(self,data,bline,flost_base=lambda x:100,max_drawdown=360,pmax_drawdown=0.011,tstep=40,vstep=20):
         '''
            data:行情对象
            bline: 价格基线
@@ -461,10 +462,10 @@ class LONG_MOVING_STOPER(LONG_STOPER):
            pmax_drawdown: 最大回撤比例(相对开仓价)
         '''
         LONG_STOPER.__init__(self,data,bline)
-        self.lost_base = lost_base
+        self.lost_base = flost_base(data.cur_day.vopen)
         self.ticks = 0
-        self.set_cur_stop(bline - lost_base)
-        self.stop0 = bline - lost_base
+        self.set_cur_stop(bline - self.lost_base)
+        self.stop0 = bline - self.lost_base
         self.name = u'多头移动止损,初始止损=%s,步长=%s/%s,最大回撤=%s' % (self.stop0,vstep,tstep,max_drawdown)
         self.thigh = bline
         self.tstep = tstep
@@ -499,16 +500,17 @@ class LONG_MOVING_STOPER(LONG_STOPER):
 
 
 class SHORT_MOVING_STOPER(SHORT_STOPER):#空头移动止损
-    def __init__(self,data,bline,lost_base=100,max_drawdown=360,pmax_drawdown=0.011,tstep=40,vstep=20):
+    def __init__(self,data,bline,flost_base=lambda x:100,max_drawdown=360,pmax_drawdown=0.011,tstep=40,vstep=20):
         '''
            data:行情对象
            bline: 价格基线
         '''
         SHORT_STOPER.__init__(self,data,bline)
-        self.lost_base = lost_base
+        #self.lost_base = lost_base
+        self.lost_base = flost_base(data.cur_day.vopen)
         self.ticks = 0
-        self.set_cur_stop(bline + lost_base)
-        self.stop0 = bline + lost_base
+        self.set_cur_stop(bline + self.lost_base)
+        self.stop0 = bline + self.lost_base
         self.name = u'空头移动止损,初始止损=%s,步长=%s/%s,最大回撤=%s' % (self.stop0,vstep,tstep,max_drawdown)
         self.tlow = bline
         self.vstep = vstep
@@ -543,9 +545,109 @@ class SHORT_MOVING_STOPER(SHORT_STOPER):#空头移动止损
                 stop_changed = True
         return (False,self.get_base_line(),stop_changed)
 
-
 if_lmv_stoper = LONG_MOVING_STOPER
 if_smv_stoper = SHORT_MOVING_STOPER
+
+if_lmv_stoper_250_42 = fcustom(LONG_MOVING_STOPER,
+                flost_base = lambda p:p/250, 
+                max_drawdown = 360, 
+                pmax_drawdown = 0.011, 
+                tstep = 40,     
+                vstep = 20,                  
+            )
+
+
+if_lmv_stoper_250_21 = fcustom(LONG_MOVING_STOPER,
+                flost_base = lambda p:p/250, 
+                max_drawdown = 360, 
+                pmax_drawdown = 0.011, 
+                tstep = 20,     
+                vstep = 10,                  
+            )
+
+if_lmv_stoper_300_42 = fcustom(LONG_MOVING_STOPER,
+                flost_base = lambda p:p/300, 
+                max_drawdown = 360, 
+                pmax_drawdown = 0.011, 
+                tstep = 40,     
+                vstep = 20,                  
+            )
+
+
+if_lmv_stoper_300_21 = fcustom(LONG_MOVING_STOPER,
+                flost_base = lambda p:p/300, 
+                max_drawdown = 360, 
+                pmax_drawdown = 0.011, 
+                tstep = 20,     
+                vstep = 10,                  
+            )
+
+if_lmv_stoper_400_21 = fcustom(LONG_MOVING_STOPER,
+                flost_base = lambda p:p/400, 
+                max_drawdown = 360, 
+                pmax_drawdown = 0.011, 
+                tstep = 20,     
+                vstep = 12, #特殊
+            )
+
+if_lmv_stoper_666_21 = fcustom(LONG_MOVING_STOPER,
+                flost_base = lambda p:p/666, 
+                max_drawdown = 360, 
+                pmax_drawdown = 0.011, 
+                tstep = 20,     
+                vstep = 10,                  
+            )
+
+if_smv_stoper_250_42 = fcustom(SHORT_MOVING_STOPER,
+                flost_base = lambda p:p/250, 
+                max_drawdown = 360, 
+                pmax_drawdown = 0.011, 
+                tstep = 40,     
+                vstep = 20,                  
+            )
+
+
+if_smv_stoper_250_21 = fcustom(SHORT_MOVING_STOPER,
+                flost_base = lambda p:p/250, 
+                max_drawdown = 360, 
+                pmax_drawdown = 0.011, 
+                tstep = 20,     
+                vstep = 10,                  
+            )
+
+if_smv_stoper_300_42 = fcustom(SHORT_MOVING_STOPER,
+                flost_base = lambda p:p/300, 
+                max_drawdown = 360, 
+                pmax_drawdown = 0.011, 
+                tstep = 40,     
+                vstep = 20,                  
+            )
+
+
+if_smv_stoper_300_21 = fcustom(SHORT_MOVING_STOPER,
+                flost_base = lambda p:p/300, 
+                max_drawdown = 360, 
+                pmax_drawdown = 0.011, 
+                tstep = 20,     
+                vstep = 10,                  
+            )
+
+if_smv_stoper_400_21 = fcustom(SHORT_MOVING_STOPER,
+                flost_base = lambda p:p/400, 
+                max_drawdown = 360, 
+                pmax_drawdown = 0.011, 
+                tstep = 20,     
+                vstep = 12, #特殊
+            )
+
+if_smv_stoper_666_21 = fcustom(SHORT_MOVING_STOPER,
+                flost_base = lambda p:p/666, 
+                max_drawdown = 360, 
+                pmax_drawdown = 0.011, 
+                tstep = 20,     
+                vstep = 10,                  
+            )
+
 
 class LONG_TIME_STOPER(LONG_STOPER):
     '''

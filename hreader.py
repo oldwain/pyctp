@@ -130,7 +130,7 @@ def make_min_filename_c(instrument,tday,path=DATA_PATH,suffix='txt'):   #根据�
 
 make_his_filename = lambda name,path=DATA_PATH:'%s%s/%s' % (path,name,HISTORY_TXT)
 
-def read1(instrument,length=6000,path=DATA_PATH,extractor=extract_std,readfunc=read_data):
+def read1(instrument,length=18000,path=DATA_PATH,extractor=extract_std,readfunc=read_data):
     '''
         历史数据和当日数据的合并，按日处理。即如果历史数据中有当日的，则忽略单文件中的当日数据
     '''
@@ -145,12 +145,12 @@ def read1(instrument,length=6000,path=DATA_PATH,extractor=extract_std,readfunc=r
         hdata = BaseObject(name=instrument,instrument=instrument,transaction=concatenate(dhistory,dtoday))
     return hdata
 
-def read1_c(instrument,tday,length=6000,path=DATA_PATH,extractor=extract_std,readfunc=read_data):
+def read1_c(instrument,tday,length=18000,path=DATA_PATH,extractor=extract_std,readfunc=read_data):
     '''
         历史数据和当日数据的合并，按日处理。即如果历史数据中有当日的，则忽略单文件中的当日数据
     '''
     #用于mock
-    #6000是22天，足够应付日ATR计算
+    #6000是22天，足够应付日ATR计算,不够，计算日ATR时误差很大
     t2order = t2order_if if is_if(instrument) else t2order_com
     dhistory = read_min_as_list(make_his_filename(instrument,path),length=length,extractor=extractor,readfunc=readfunc,t2order=t2order)
     if tday == -1: #不需要当日数据,用于测试时的初始化
