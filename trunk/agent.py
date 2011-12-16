@@ -1142,7 +1142,7 @@ class Agent(AbsAgent):
                     #mysignal = order.stoper.check(ctick)
                     mysignal = order.check_stop(ctick)
                     if mysignal[0] != 0 and order.close_lock == False:    #平仓
-                        logging.info(u'平仓信号,time=%s,inst=%s,cur_price=%s' % (ctick.time,cur_inst.name,ctick.price))
+                        logging.info(u'平仓信号,time=%s,inst=%s,cur_price=%s,base_price=%s' % (ctick.time,cur_inst.name,ctick.price,mysignal[1]))
                         signals.append(BaseObject(instrument=cur_inst,
                                 volume=order.opened_volume,
                                 #direction = dir_py2ctp(order.get_stop_direction()),
