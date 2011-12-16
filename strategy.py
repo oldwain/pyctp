@@ -270,6 +270,8 @@ class LONG_BREAK(BREAK):    #多头突破策略
         self.name = u'多头突破基类'
 
     def calc_target_price(self,base_price,tick_base):    #计算开单加价
+        logging.info(u'LB_CTP:base_price=%s' % base_price)
+        base_price = int(base_price)
         if base_price % tick_base > 0:  #取整
             base_price = (base_price / tick_base + 1) * tick_base 
         return base_price + tick_base * self.max_overflow
@@ -282,6 +284,8 @@ class SHORT_BREAK(BREAK):   #空头突破策略
         self.name = u'空头突破基类'
 
     def calc_target_price(self,base_price,tick_base):#计算开仓加价
+        logging.info(u'SB_CTP:base_price=%s' % base_price)
+        base_price = int(base_price)
         if base_price % tick_base > 0:
             base_price = (base_price / tick_base - 1) * tick_base
         return base_price - tick_base * self.max_overflow
@@ -291,6 +295,7 @@ class SHORT_BREAK(BREAK):   #空头突破策略
 ###回归类策略以计算所得价为基准价，并挂单来做钓鱼式成交
 class ENTRY(object):    #回归策略标记
     def calc_target_price(self,base_price,tick_base):    #回归策略不加价
+        base_price = int(base_price)
         return base_price
 
 class LONG_ENTRY(ENTRY):    #多头回归策略
@@ -358,6 +363,8 @@ class LONG_STOPER(STOPER):
         self.name = u'多头离场基类'
 
     def calc_target_price(self,base_price,tick_base):#计算多头平仓加价,
+        logging.info(u'LS_CTP:base_price=%s' % base_price)
+        base_price = int(base_price)
         if base_price % tick_base > 0:
             base_price = (base_price / tick_base - 1) * tick_base 
         return base_price - tick_base * self.max_overflow
@@ -376,6 +383,8 @@ class SHORT_STOPER(STOPER):
         self.name = u'空头离场基类'
 
     def calc_target_price(self,base_price,tick_base):#计算空头平仓加价,
+        logging.info(u'SS_CTP:base_price=%s' % base_price)
+        base_price = int(base_price)
         if base_price % tick_base > 0:
             base_price = (base_price / tick_base + 1) * tick_base 
         return base_price + tick_base * self.max_overflow
@@ -739,8 +748,8 @@ class LONG_LAST_STOPER(LONG_STOPER):
         if tick.iorder < self.ttrace + 1:
             return (False,tick.price,False)
         if tick.price < self.get_cur_stop() or tick.iorder >= self.tend-1:
-            #return (True,tick.price,False)
-            return (True,self.get_cur_stop(),False)
+            return (True,tick.price,False)
+            #return (True,self.get_cur_stop(),False)    #不能用这个，这个有小数风险
         if tick.switch_min:
             if tick.iorder-1 == self.ttrace:
                 self.htrace = self.calc_htrace(self.data)
@@ -810,6 +819,7 @@ class SHORT_LAST_STOPER(SHORT_STOPER):
             return (False,tick.price,False)
         if tick.price > self.get_cur_stop() or tick.iorder >= self.tend-1:
             return (True,tick.price,False)
+            #return (True,self.get_cur_stop(),False)    #不能用这个，这个有小数风险
         if tick.switch_min:
             if tick.iorder-1 == self.ttrace:
                 self.ltrace = self.calc_ltrace(self.data)
