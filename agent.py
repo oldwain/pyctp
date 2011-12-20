@@ -417,6 +417,7 @@ class TraderSpiDelegate(TraderSpi):
         self.api.ReqQrySettlementInfo(req,self.agent.inc_request_id())
 
     def confirm_settlement_info(self):
+        self.logger.info(u'TD-CSI:准备确认结算单')
         req = ustruct.SettlementInfoConfirm(BrokerID=self.broker_id,InvestorID=self.investor_id)
         self.api.ReqSettlementInfoConfirm(req,self.agent.inc_request_id())
 
@@ -424,9 +425,17 @@ class TraderSpiDelegate(TraderSpi):
         '''请求查询投资者结算信息响应'''
         print u'Rsp 结算单查询'
         if(self.resp_common(pRspInfo,bIsLast,u'结算单查询')>0):
-            self.logger.info(u'TD:结算单内容:%s' % pSettlementInfo.Content)
+            self.logger.info(u'结算单查询完成,准备确认')
+            try:
+                self.logger.info(u'TD:结算单内容:%s' % pSettlementInfo.Content)
+            except Exception,inst:
+                self.logger.warning(u'TD-ORQSI-A 结算单内容错误:%s' % str(inst))
             self.confirm_settlement_info()
         else:  #这里是未完成分支,需要直接忽略
+            try:
+                self.logger.info(u'TD:结算单接收中...:%s' % pSettlementInfo.Content)
+            except Exception,inst:
+                self.logger.warning(u'TD-ORQSI-B 结算单内容错误:%s' % str(inst))
             #self.agent.initialize()
             pass
             
@@ -444,6 +453,7 @@ class TraderSpiDelegate(TraderSpi):
                     self.logger.info(u'TD:结算单确认结果为None')
                 self.query_settlement_info()
             else:
+                self.agent.isSettlementInfoConfirmed = True
                 self.logger.info(u'TD:最新结算单已确认，不需再次确认,最后确认时间=%s,scur_day:%s' % (pSettlementInfoConfirm.ConfirmDate,self.agent.scur_day))
                 self.agent.initialize()
 
@@ -451,6 +461,7 @@ class TraderSpiDelegate(TraderSpi):
     def OnRspSettlementInfoConfirm(self, pSettlementInfoConfirm, pRspInfo, nRequestID, bIsLast):
         '''投资者结算结果确认响应'''
         if(self.resp_common(pRspInfo,bIsLast,u'结算单确认')>0):
+            self.agent.isSettlementInfoConfirmed = True
             self.logger.info(u'TD:结算单确认时间: %s-%s' %(pSettlementInfoConfirm.ConfirmDate,pSettlementInfoConfirm.ConfirmTime))
         self.agent.initialize()
 
@@ -824,6 +835,10 @@ class Agent(AbsAgent):
 
         self.init_init()    #init中的init,用于子类的处理
 
+        #结算单
+        self.isSettlementInfoConfirmed = False  #结算单未确认
+
+
     def init_init(self):    #init中的init,用于子类的处理
         pass
 
@@ -970,6 +985,9 @@ class Agent(AbsAgent):
             准备计算, 包括分钟数据、指标的计算
             返回值表示该tick数据是否有效
         '''
+        if self.isSettlementInfoConfirmed == False: #结算单未确认
+            logging.info(u'结算单未确认.....')
+            self.trader.myspi.confirm_settlement_info()
         inst = ctick.instrument
         if inst not in self.instruments:
             logger.info(u'接收到未订阅的合约数据:%s' % (inst,))
@@ -1434,6 +1452,7 @@ class Agent(AbsAgent):
 
     def day_switch(self,scur_day):  #重新初始化opener
         self.scur_day = scur_day
+        self.isSettlementInfoConfirmed = False
         self.actions = []
         for cur_inst in self.instruments.values():
             cur_inst.day_switch()
