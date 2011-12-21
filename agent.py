@@ -961,6 +961,9 @@ class Agent(AbsAgent):
         if self.trader != None and not self.trader.myspi.is_logged:
             logging.info(u'trader not logging,try login.......')
             self.trader.myspi.login()
+        elif not self.isSettlementInfoConfirmed: #结算单未确认
+            logging.info(u'结算单未确认.....')
+            self.trader.myspi.confirm_settlement_info()
         inst = ctick.instrument
         if not self.prepare_tick(ctick):    #非法ticks数据
             #print 'invalid ticks'
@@ -985,9 +988,6 @@ class Agent(AbsAgent):
             准备计算, 包括分钟数据、指标的计算
             返回值表示该tick数据是否有效
         '''
-        if self.isSettlementInfoConfirmed == False: #结算单未确认
-            logging.info(u'结算单未确认.....')
-            self.trader.myspi.confirm_settlement_info()
         inst = ctick.instrument
         if inst not in self.instruments:
             logger.info(u'接收到未订阅的合约数据:%s' % (inst,))
