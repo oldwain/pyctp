@@ -1122,16 +1122,21 @@ class Agent(AbsAgent):
             ddata.cur_day.vopen = ctick.price
             ddata.cur_day.vhigh = ctick.price
             ddata.cur_day.vlow = ctick.price
+            ddata.cur_day.iihigh = 0
+            ddata.cur_day.iilow = 0
         else:
             if ctick.price > ddata.cur_day.vhigh:
                 ddata.cur_day.vhigh = ctick.price   #根据当前价比较得到的最大/最小
+                ddata.cur_day.iihigh = ctick.iorder
             if ctick.price < ddata.cur_day.vlow:
                 ddata.cur_day.vlow = ctick.price
+                ddata.cur_day.iilow = ctick.iorder
         ddata.cur_day.vholding = ctick.holding
         ddata.cur_day.vvolume = ctick.dvolume
         ddata.cur_day.vhighd = ctick.high   #服务器传过来的最大/最小
         ddata.cur_day.vlowd = ctick.low
         ddata.cur_day.vclose = ctick.price
+        ddata.cur_day.vtime = ctick.min1
         #if (hreader.is_if(ctick.instrument) and ctick.min1 == 1514 and ctick.sec==59) or (not hreader.is_if(ctick.instrument) and ctick.min1 == 1459 and ctick.sec==59): #收盘作业
         #print ddata.cur_min.viorder,ctick.sec,ctick.min1,ddata.cur_min.vtime
         if ddata.cur_min.viorder == 270 and ctick.sec == 59 and ctick.min1 >=ddata.cur_min.vtime: #避免收到历史行情引发问题

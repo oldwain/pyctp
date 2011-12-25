@@ -268,6 +268,8 @@ def prepare_data(instruments,tday,path=DATA_PATH):
                         vlowd = tdata.d1[ILOW][-1],
                         vholding = tdata.d1[IHOLDING][-1],
                         vvolume = tdata.d1[IVOL][-1],
+                        iihigh = 270,   #与行情无关
+                        iilow = 270,
                     )
         elif len(tdata.d1[IDATE])>0:
             xtimes = tdata.transaction[IORDER]
@@ -286,6 +288,14 @@ def prepare_data(instruments,tday,path=DATA_PATH):
                         vholding = tdata.sholding[-1],
                         vvolume = tdata.svolume[-1],
                     )
+            for i in range(len(tdata.stime)-1,idlast-1,-1):
+                if tdata.shigh[i] == tdata.cur_day.vhigh:
+                    break
+            tdata.cur_day.iihigh = tdata.siorder[i]
+            for i in range(len(tdata.stime)-1,idlast-1,-1):
+                if tdata.slow[i] == tdata.cur_day.vlow:
+                    break
+            tdata.cur_day.iilow = tdata.siorder[i]
         else:
             tdata.cur_day = BaseObject(
                         vdate= 0,
@@ -298,6 +308,8 @@ def prepare_data(instruments,tday,path=DATA_PATH):
                         vlowd = 0,
                         vholding = 0,
                         vvolume = 0,
+                        iihigh = 0,
+                        iilow = 0,
                     )
         if len(tdata.sdate)>0:
             tdata.cur_min = BaseObject(
