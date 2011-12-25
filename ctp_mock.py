@@ -33,7 +33,7 @@ class TraderMock(object):
     def __init__(self,myagent):
         self.myagent = myagent
         self.available = 1000000    #初始100W
-        self.myspi = BaseObject(is_logged=True)
+        self.myspi = BaseObject(is_logged=True,confirm_settlement_info=self.confirm_settlement_info)
 
     def ReqOrderInsert(self, order, request_id):
         '''报单录入请求, 需要调用成交函数'''
@@ -93,6 +93,9 @@ class TraderMock(object):
     def ReqQryInvestorPosition(self,req,req_id=0):
         #暂默认无持仓
         pass
+
+    def confirm_settlement_info(self):
+        self.myagent.isSettlementInfoConfirmed = True
 
 
 class UserMock(object):
@@ -194,6 +197,7 @@ def create_agent_with_mocktrader(instrument,tday,sname='strategy_mock.ini'):
 def run_ticks(ticks,myagent):
     for tick in ticks:
         myagent.inc_tick()
+        #print tick.min1
         myagent.RtnTick(tick)
 
 def log_config():
@@ -235,8 +239,8 @@ import hreader
 
 ctp_mock.log_config()
 
-preday = 20111215
-tday = 20111216
+preday = 20111222
+tday = 20111223
 instrument = 'IF1201'
 myagent = ctp_mock.create_agent_with_mocktrader(instrument,-1,sname='strategy_trader.ini')    #不需要tday的当日数据
 myagent.instruments[instrument].t2order = base.t2order_if
