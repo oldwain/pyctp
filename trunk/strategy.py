@@ -565,6 +565,13 @@ if_lmv_stoper_250_42 = fcustom(LONG_MOVING_STOPER,
                 vstep = 20,                  
             )
 
+if_lmv_stoper_250_84 = fcustom(LONG_MOVING_STOPER,
+                flost_base = lambda p:p/250, 
+                max_drawdown = 360, 
+                pmax_drawdown = 0.011, 
+                tstep = 80,     
+                vstep = 40,                  
+            )
 
 if_lmv_stoper_250_21 = fcustom(LONG_MOVING_STOPER,
                 flost_base = lambda p:p/250, 
