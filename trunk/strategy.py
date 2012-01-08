@@ -229,16 +229,17 @@ class Resumable(object):#可中间恢复
     def resume(self,data,scur_day):  #恢复opener/stop的状态,主要用于opener
         if len(data.sdate) == 0:    #史前
             return
-        elif data.sdate[-1] < scur_day:  #scur_day>data.vdate,当日还没有开始,不需要resume
-            return
-        elif data.sdate[-1] == scur_day:
+        #elif data.sdate[-1] < scur_day:  #scur_day>data.vdate,当日还没有开始,不需要resume
+        #    return
+        #elif data.sdate[-1] == scur_day:
+        else:
             i = len(data.sdate)-2
             while i>=0 and data.sdate[i]==scur_day:
                  i -= 1
             i += 1  #当日数据的开始
             self.dresume(data,i)
-        else:#只有在测试时可能,但也是错误情况
-            logging.error(u'scur_day=%s,小于行情日%s' % (scur_day,data.sdate[-1]))
+        #else:#只有在测试时可能,但也是错误情况
+        #    logging.error(u'scur_day=%s,小于行情日%s' % (scur_day,data.sdate[-1]))
         pass
 
     def dresume(self,data,i):#min序列从i开始为当日数据
