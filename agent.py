@@ -317,7 +317,8 @@ class MdSpiDelegate(MdSpi):
             rev.time = rev.date%10000 * 1000000+ rev.min1*100 + rev.sec
             rev.switch_min = False  #分钟切换
         except Exception,inst:
-            self.logger.warning(u'MD:行情数据转换错误:%s' % str(inst))
+            #self.logger.warning(u'MD:行情数据转换错误:%s' % str(inst))
+            self.logger.warning(u'MD:%s 行情数据转换错误:%s' % (market_data.InstrumentID,str(inst)))
         return rev
 
 class TraderSpiDelegate(TraderSpi):
