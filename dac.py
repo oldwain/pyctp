@@ -281,6 +281,7 @@ def STREND(data):
     data.t120 = strend2(data.ma30_120)
     data.ma15_20 = ma(data.m15[ICLOSE],20)
     data.r20 = strend2(data.ma15_20)
+    data.s_ma20 = strend2(data.ma_20)
 
     #pass
 
@@ -298,6 +299,8 @@ def STREND1(data):
         data.r20.append(0)
         ma1(data.m15[ICLOSE],20,data.ma15_20)
         strend2_1(data.ma15_20,data.r20)
+    data.s_ma20.append(0)
+    strend2_1(data.ma_20,data.s_ma20)
 
     #pass
 
@@ -311,7 +314,7 @@ def MA(data):
     #data.ma_7 = ma(data.sclose,7)
     #data.ma_10 = ma(data.sclose,10)
     data.ma_13 = ma(data.sclose,13)
-    #data.ma_20 = ma(data.sclose,20)
+    data.ma_20 = ma(data.sclose,20)
     data.ma_30 = ma(data.sclose,30)
     #data.ma_60 = ma(data.sclose,60)
     #data.ma_120 = ma(data.sclose,120)
@@ -328,7 +331,7 @@ def MA1(data):
     #data.ma_7.append(0)
     #data.ma_10.append(0)
     data.ma_13.append(0)
-    #data.ma_20.append(0)
+    data.ma_20.append(0)
     data.ma_30.append(0)
     #data.ma_60.append(0)
     #data.ma_120.append(0)
@@ -339,7 +342,7 @@ def MA1(data):
     #ma1(data.sclose,7,data.ma_7)
     #ma1(data.sclose,10,data.ma_10)
     ma1(data.sclose,13,data.ma_13)
-    #ma1(data.sclose,20,data.ma_20)
+    ma1(data.sclose,20,data.ma_20)
     ma1(data.sclose,30,data.ma_30)
     #ma1(data.sclose,60,data.ma_60)
     #ma1(data.sclose,120,data.ma_120)
