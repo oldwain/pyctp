@@ -249,6 +249,8 @@ def prepare_data(instruments,tday,path=DATA_PATH):
         tdata.m3 = compress(tdata.transaction,oc_index_3)
         oc_index_5 = PREPARER.p5(tdata.transaction[IORDER])
         tdata.m5 = compress(tdata.transaction,oc_index_5)
+        oc_index_10 = PREPARER.p10(tdata.transaction[IORDER])
+        tdata.m10 = compress(tdata.transaction,oc_index_10)
         oc_index_15 = PREPARER.p15(tdata.transaction[IORDER])
         tdata.m15 = compress(tdata.transaction,oc_index_15)
         oc_index_30 = PREPARER.p30(tdata.transaction[IORDER])
@@ -378,6 +380,7 @@ CM_XPREPARER.ISEND_DAY = lambda x:x%10000 == 1459
 SPREPARER = BaseObject()
 SPREPARER.ISEND_3 = lambda x:x%3==2 and x>0
 SPREPARER.ISEND_5 = lambda x: x%5==4 and x>0
+SPREPARER.ISEND_10 = lambda x: x%10==0 and x>0
 SPREPARER.ISEND_15 = lambda x:x%15 == 14 and x>0
 SPREPARER.ISEND_30 = lambda x:x%30 == 29 and x>0
 SPREPARER.ISEND_DAY = lambda x:x == 270
@@ -406,6 +409,12 @@ class XPREPARER(object):
 
     def p5(self,xtimes):#切5分钟,返回5分钟(5分开盘index,5分收盘index)
         poss = filter(lambda x:self.fpreparer.ISEND_5(x[0]),zip(xtimes,range(len(xtimes))))
+        cposs = [y for (x,y) in poss]   #close
+        oposs = [c+1 if c-1>0 else 0 for c in cposs] #close
+        return zip(oposs,cposs[1:])
+
+    def p10(self,xtimes):#切10分钟,返回10分钟(10分开盘index,10分收盘index)
+        poss = filter(lambda x:self.fpreparer.ISEND_10(x[0]),zip(xtimes,range(len(xtimes))))
         cposs = [y for (x,y) in poss]   #close
         oposs = [c+1 if c-1>0 else 0 for c in cposs] #close
         return zip(oposs,cposs[1:])
@@ -485,6 +494,11 @@ def time_period_switch(data):
                                         or data.stime[-1] > data.m5[ITIME][-1]
                                     ):#添加新的5分钟
         append1(data.m5,data,5)
+    if fpreparer.ISEND_10(data.siorder[-1]) and (len(data.m10[IDATE])==0 
+                                        or data.sdate[-1] > data.m10[IDATE][-1] 
+                                        or data.stime[-1] > data.m10[ITIME][-1]
+                                    ):#添加新的5分钟
+        append1(data.m10,data,10)
     if fpreparer.ISEND_15(data.siorder[-1]) and (len(data.m15[IDATE])==0 
                                         or data.sdate[-1] > data.m15[IDATE][-1] 
                                         or data.stime[-1] > data.m15[ITIME][-1]
