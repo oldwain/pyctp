@@ -282,6 +282,7 @@ def STREND(data):
     data.ma15_20 = ma(data.m15[ICLOSE],20)
     data.r20 = strend2(data.ma15_20)
     data.s_ma20 = strend2(data.ma_20)
+    data.sh10 = strend2(data.m10[IHIGH])
 
     #pass
 
@@ -299,6 +300,9 @@ def STREND1(data):
         data.r20.append(0)
         ma1(data.m15[ICLOSE],20,data.ma15_20)
         strend2_1(data.ma15_20,data.r20)
+    if len(data.m10[ICLOSE]) > len(data.sh10):  #需要计算
+        data.sh10.append(0)
+        strend2_1(data.m10[IHIGH],data.sh10)
     data.s_ma20.append(0)
     strend2_1(data.ma_20,data.s_ma20)
 
