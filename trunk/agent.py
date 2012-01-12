@@ -216,6 +216,7 @@ class MdSpiDelegate(MdSpi):
         self.agent = agent
         ##必须在每日重新连接时初始化它. 这一点用到了生产行情服务器收盘后关闭的特点(模拟的不关闭)
         MdSpiDelegate.last_map = dict([(id,0) for id in instruments])
+        self.last_day = 0
 
     def checkErrorRspInfo(self, info):
         if info.ErrorID !=0:
@@ -313,9 +314,13 @@ class MdSpiDelegate(MdSpi):
             rev.bid_volume = market_data.BidVolume1
             rev.ask_price = int(market_data.AskPrice1*10+0.1)
             rev.ask_volume = market_data.AskVolume1
-            rev.date = int(market_data.TradingDay)
+            if len(market_data.TradingDay.strip()) > 0:
+                rev.date = int(market_data.TradingDay)
+            else:#有时候会有错
+                rev.date = self.last_day    
             rev.time = rev.date%10000 * 1000000+ rev.min1*100 + rev.sec
             rev.switch_min = False  #分钟切换
+            self.last_day = rev.date
         except Exception,inst:
             #self.logger.warning(u'MD:行情数据转换错误:%s' % str(inst))
             self.logger.warning(u'MD:%s 行情数据转换错误:%s,updateTime="%s",msec="%s",tday="%s"' % (market_data.InstrumentID,str(inst),market_data.UpdateTime,market_data.UpdateMillisec,market_data.TradingDay))
