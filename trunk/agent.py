@@ -676,9 +676,9 @@ class c_instrument(object):
         if self.cur_vtimes >= self.max_vtimes:    #超过日开仓次数限制
             logging.info(u'超过日开仓手次限制:%s|%s' % (self.cur_vtimes,self.max_vtimes))
             return 0
-        if self.cur_profit <= -self.max_lost:   #超过日最大损失
-            logging.info(u'超过日开损失限制:%s|%s' % (self.cur_profit,self.max_lost))
-            return 0
+        #if self.cur_profit <= -self.max_lost:   #超过日最大损失
+        #    logging.info(u'超过日开损失限制:%s|%s' % (self.cur_profit,self.max_lost))
+        #    return 0
         locked_volume = 0
         opened_volume = 0
         for position in self.position_detail.values():
