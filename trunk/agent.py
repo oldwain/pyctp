@@ -701,9 +701,9 @@ class c_instrument(object):
         #print 'self.name=%s,price=%s,multiple=%s,my_marginrate=%s' % (self.name,price,self.multiple,my_marginrate)
         if self.name[:2].upper() == 'IF':
             #print 'price=%s,multiple=%s,my_marginrate=%s' % (price,self.multiple,my_marginrate)
-            return price / 10.0 * self.multiple * my_marginrate 
+            return price / 10.0 * self.multiple * my_marginrate * 1.05  #避免保证金问题
         else:
-            return price * self.multiple * my_marginrate 
+            return price * self.multiple * my_marginrate * 1.05
 
     def make_target_price(self,price,direction): 
         '''
