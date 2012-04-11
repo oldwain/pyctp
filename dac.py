@@ -155,6 +155,23 @@ def ma(source,length):
 
     return rev
 
+def msum(source,length):
+    """ 计算移动累加
+        @param source 源数组
+        @param length 累加跨度
+        @return 移动累加序列
+    """
+    slen = len(source)
+    rev = [0] * slen
+    if slen < length:
+        return rev
+    
+    acc = [0] + accumulate(source)
+    rev = [0]*(length-1) + [sl-sf for sl,sf in zip(acc[length:],acc[:slen-length+1])]
+
+    return rev
+
+
 def ma1(source,length,target):
     if len(source)<1:
         return 0
@@ -315,7 +332,7 @@ def MA(data):
     #data.ma_1 = ma(data.sclose,1)
     
     data.ma_5 = ma(data.sclose,5)
-    #data.ma_7 = ma(data.sclose,7)
+    data.ma_7 = ma(data.sclose,7)
     #data.ma_10 = ma(data.sclose,10)
     data.ma_13 = ma(data.sclose,13)
     data.ma_20 = ma(data.sclose,20)
@@ -332,7 +349,7 @@ def MA1(data):
     #print u'before:收盘序列长度:%s,ma5序列长度:%s' % (len(data.sclose),len(data.ma_5))
     #data.ma_1.append(0)
     data.ma_5.append(0)
-    #data.ma_7.append(0)
+    data.ma_7.append(0)
     #data.ma_10.append(0)
     data.ma_13.append(0)
     data.ma_20.append(0)
@@ -343,7 +360,7 @@ def MA1(data):
     #data.ma_270.append(0)    
     #ma1(data.sclose,1,data.ma_1)    
     ma1(data.sclose,5,data.ma_5)
-    #ma1(data.sclose,7,data.ma_7)
+    ma1(data.sclose,7,data.ma_7)
     #ma1(data.sclose,10,data.ma_10)
     ma1(data.sclose,13,data.ma_13)
     ma1(data.sclose,20,data.ma_20)
@@ -354,6 +371,25 @@ def MA1(data):
     #ma1(data.sclose,270,data.ma_270)
     #print u'after:收盘序列长度:%s,ma5序列长度:%s' % (len(data.sclose),len(data.ma_5))
     assert len(data.sclose) == len(data.ma_5),u'sclose序列和ma_5序列长度不同 len(data.sclose)=%s,len(data.ma5)=%s' % (len(data.sclose),len(data.ma_5))
+
+def ADX(data,n=14,m=6):
+    '''计算ADX
+    '''
+    tpdm = [ x1-x2 for x1,x2 in zip(data.high,[0]+data.high[0:1]+data.high[:-1])]
+    tndm = [ x2-x1 for x1,x2 in zip(data.low,data.low[0:1]+data.low[:-1])]
+    pdm = [ p if p>0 and p>d else 0 for p,d in zip(tpdm,tndm]
+    ndm = [ d if d>0 and d>p else 0 for p,d in zip(tpdm,tndm]
+    xtr = msum(data.tr,n)
+    data.pdi = [ ps * 10000 / x for ps,x in zip(msum(pdm,n),xtr)]
+    data.ndi = [ ps * 10000 / x for ps,x in zip(msum(ndm,n),xtr)]
+    vadx = [ (pi-di)*10000 / (pi+di) for pi,di in zip(data.pdi,data.ndi)]
+    vadx = [ v if v>0 else -v for v in vadx]
+    data.adx = ma(vadx,m)
+
+def ADX1(data,n=14,m=6):
+    pass
+
+
 
 def MACD(data):
     '''
