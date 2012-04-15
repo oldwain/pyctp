@@ -204,15 +204,18 @@ def log_config():
     config_logging('ctp_trade_mock.log',console_level=logging.INFO)
 
 '''
+##需要运行python26
+
+
 import base
 import ctp_mock
 import hreader
 
 ctp_mock.log_config()
 
-preday = 20111207
-tday = 20111208
-instrument = 'IF1112'
+preday = 20120112
+tday = 20120113
+instrument = 'IF1201'
 myagent = ctp_mock.create_agent_with_mocktrader(instrument,-1)    #不需要tday的当日数据
 myagent.instruments[instrument].t2order = base.t2order_if
 myagent.scur_day = preday
@@ -226,7 +229,7 @@ myagent.resume()
 ctp_mock.run_ticks(ticks,myagent)
 
 ##推进
-tday = 20120110
+tday = 20120413
 myagent.day_switch(tday)
 ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
 ctp_mock.run_ticks(ticks,myagent)
@@ -239,9 +242,9 @@ import hreader
 
 ctp_mock.log_config()
 
-preday = 20120210
-tday = 20120213
-instrument = 'IF1203'
+preday = 20120209
+tday = 20120210
+instrument = 'IF1202'
 myagent = ctp_mock.create_agent_with_mocktrader(instrument,-1,sname='strategy_trader.ini')    #不需要tday的当日数据
 myagent.instruments[instrument].t2order = base.t2order_if
 myagent.scur_day = preday

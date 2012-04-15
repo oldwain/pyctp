@@ -133,7 +133,7 @@ import threading
 import bisect
 
 from base import *
-from dac import ATR,ATR1,STREND,STREND1,MA,MA1,MACD,MACD1
+from dac import ATR,ATR1,STREND,STREND1,MA,MA1,MACD,MACD1,date2week
 import hreader
 
 import UserApiStruct as ustruct
@@ -1130,6 +1130,7 @@ class Agent(AbsAgent):
             ddata.cur_day.vlow = ctick.price
             ddata.cur_day.iihigh = 0
             ddata.cur_day.iilow = 0
+            ddata.cur_day.weekday = date2week(ctick.date)
         else:
             if ctick.price > ddata.cur_day.vhigh:
                 ddata.cur_day.vhigh = ctick.price   #根据当前价比较得到的最大/最小

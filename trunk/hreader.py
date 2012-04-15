@@ -6,6 +6,7 @@ import logging
 
 
 from base import *
+from dac import date2week
 
 #logger = logging.getLogger('ctp.hreader')    
 
@@ -272,6 +273,7 @@ def prepare_data(instruments,tday,path=DATA_PATH):
                         vvolume = tdata.d1[IVOL][-1],
                         iihigh = 270,   #与行情无关
                         iilow = 270,
+                        weekday = date2week(tdata.d1[IDATE][-1]),
                     )
         elif len(tdata.d1[IDATE])>0:
             xtimes = tdata.transaction[IORDER]

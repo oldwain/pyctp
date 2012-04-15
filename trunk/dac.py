@@ -13,6 +13,16 @@ XBASE = 100  #整数运算的放大倍数
 CBASE = XBASE * XBASE #XATR倍数
 FBASE = 10 #整数运算的放大倍数2
 
+def date2week(iday):
+    #http://blog.csdn.net/hawkfeifei/article/details/4337181
+    year = iday/10000
+    month = iday/100%100
+    day = iday%100
+    if month <= 2:
+        month += 12
+        year -= 1
+    return (day+2*month+3*(month+1)/5+year+year/4-year/100+year/400)%7 + 1  #转化为1-7
+
 
 def cexpma(source,n): 
     ''' 计算cexpma序列
@@ -377,8 +387,8 @@ def ADX(data,n=14,m=6):
     '''
     tpdm = [ x1-x2 for x1,x2 in zip(data.high,[0]+data.high[0:1]+data.high[:-1])]
     tndm = [ x2-x1 for x1,x2 in zip(data.low,data.low[0:1]+data.low[:-1])]
-    pdm = [ p if p>0 and p>d else 0 for p,d in zip(tpdm,tndm]
-    ndm = [ d if d>0 and d>p else 0 for p,d in zip(tpdm,tndm]
+    pdm = [ p if p>0 and p>d else 0 for p,d in zip(tpdm,tndm)]
+    ndm = [ d if d>0 and d>p else 0 for p,d in zip(tpdm,tndm)]
     xtr = msum(data.tr,n)
     data.pdi = [ ps * 10000 / x for ps,x in zip(msum(pdm,n),xtr)]
     data.ndi = [ ps * 10000 / x for ps,x in zip(msum(ndm,n),xtr)]
