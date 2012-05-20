@@ -274,6 +274,7 @@ def prepare_data(instruments,tday,path=DATA_PATH):
                         iihigh = 270,   #与行情无关
                         iilow = 270,
                         weekday = date2week(tdata.d1[IDATE][-1]),
+                        ibegin = len(tdata.sdate)-271,    #这个其实不一定对，未必每天有271个数据，可能914会没有,那就是上一天的最后一个。但下一个数据来时会处理掉
                     )
         elif len(tdata.d1[IDATE])>0:
             xtimes = tdata.transaction[IORDER]
@@ -291,6 +292,7 @@ def prepare_data(instruments,tday,path=DATA_PATH):
                         vlowd = min(tdata.slow[idlast:]),
                         vholding = tdata.sholding[-1],
                         vvolume = tdata.svolume[-1],
+                        ibegin = idlast,    #第一分钟的坐标
                     )
             for i in range(len(tdata.stime)-1,idlast-1,-1):
                 if tdata.shigh[i] == tdata.cur_day.vhigh:
@@ -314,6 +316,7 @@ def prepare_data(instruments,tday,path=DATA_PATH):
                         vvolume = 0,
                         iihigh = 0,
                         iilow = 0,
+                        ibegin = 0,
                     )
         if len(tdata.sdate)>0:
             tdata.cur_min = BaseObject(
