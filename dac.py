@@ -23,6 +23,27 @@ def date2week(iday):
         year -= 1
     return (day+2*month+3*(month+1)/5+year+year/4-year/100+year/400)%7 + 1  #转化为1-7
 
+def xdiff(source):
+    '''
+        消除连续的同向信号
+        如 0,0,1,0,0,1,0,0,-1,0,1 --> 0,0,1,0,0,0,0,0,-1,0,1
+    '''
+    if len(source)==0:
+        return []
+    rev = [0]*len(source)
+    dcur = 1 if source[0]>0 else -1 if source[0]<0 else 0
+    rev[0] = dcur
+    for i in range(len(source)):
+        if dcur >= 0 and source[i] < 0:
+            dcur = -1
+            rev[i] = dcur
+        elif dcur <=0 and source[i] > 0:
+            dcur = 1
+            rev[i] = dcur
+        else:#0或同向信号
+            pass
+    return rev
+
 
 def cexpma(source,n): 
     ''' 计算cexpma序列
@@ -127,6 +148,18 @@ def xatr1(latr,sclose,lxatr):
     assert len(latr) == len(sclose) == len(lxatr),u'源序列与目标序列长度不相等,%s:%s' % (len(latr),len(target))
     lxatr[-1] = latr[-1] * CBASE / sclose[-1]
     return lxatr[-1]
+
+def sdiff(source1,source2):
+    return [sf - ss for sf,ss in zip(source1,source2)]
+
+def rsdiff(source1,source2,offset):
+    if len(source2) == 0:
+        return []
+    if len(source2) >= offset:
+        return sdiff(source1,[source2[0]]*offset + source2[:len(source2)-offset])
+    else:
+        return sdiff(source1,[source2[0]]*len(source2))
+
 
 def accumulate(source):
     if(len(source) < 1):
@@ -236,6 +269,65 @@ def strend2_1(source,target):
         target[-1] = cur + 1 if cur >= 0 else cur-1 #最初为0时，也算上升
     return target[-1]
 
+
+
+############
+# 从d1ex.py复制
+#
+############
+def tmax(source,covered): #最近len个数据的max值
+    ''' 等同于
+        tmaxmin(source,covered,max,np.max,-99999999)
+        是其展开版本
+    '''
+    tm = -99999999
+    rev = [0]*length
+    length = len(source)
+    prelen = length > covered and covered or length
+    for i in range(prelen):
+        v = source[i]
+        if tm < v:
+            tm = v
+        rev[i] = tm
+    buffer = deque([v for v in source[:prelen]])   #优化方法，避免vquit=source[i-covered]的方式，对nbarray的直接索引有严重的性能问题
+    for i in range(prelen,length):
+        v = source[i]
+        buffer.append(v)
+        vquit=buffer.popleft()
+        if tm < v:
+            tm = v
+        if tm == vquit and v != tm: #退出的正好是最大值,计算前covered-1个元素的最大值, pre=source[i-1]
+            tm = max(source[i-covered+1:i+1])
+        rev[i] = tm
+    return rev
+
+def tmin(source,covered): #最近len个数据的max值
+    ''' 等同于
+        tmaxmin(source,covered,min,np.min,99999999)
+        是其展开版本
+    '''
+    tm = 99999999
+    length = len(source)
+    rev = [0]*length
+    prelen = length > covered and covered or length
+    for i in range(prelen):
+        v = source[i]
+        if tm > v:
+            tm = v
+        rev[i] = tm
+    buffer = deque([v for v in source[:prelen]])   #优化方法，避免vquit=source[i-covered]的方式，对nbarray的直接索引有严重的性能问题
+    for i in range(prelen,length):
+        v = source[i]
+        buffer.append(v)
+        vquit=buffer.popleft()
+        if tm > v:
+            tm = v
+        if tm == vquit and v != tm: #退出的正好是最大值,计算前covered-1个元素的最大值, pre=source[i-1]
+            tm = min(source[i-covered+1:i+1])
+        rev[i] = tm
+    return rev
+
+
 ###包装类
 from base import *
 def ATR(data):
@@ -310,7 +402,7 @@ def STREND(data):
     data.r20 = strend2(data.ma15_20)
     data.s_ma20 = strend2(data.ma_20)
     data.sh10 = strend2(data.m10[IHIGH])
-
+    #data.slh_10 = strend2(data.dlh_10)
     #pass
 
 def STREND1(data):
@@ -332,6 +424,8 @@ def STREND1(data):
         strend2_1(data.m10[IHIGH],data.sh10)
     data.s_ma20.append(0)
     strend2_1(data.ma_20,data.s_ma20)
+    #data.slh_10.append(0)
+    #strend2_1(data.dlh_10,data.slh_10)
 
     #pass
 
@@ -351,7 +445,13 @@ def MA(data):
     #data.ma_120 = ma(data.sclose,120)
     #data.ma_135 = ma(data.sclose,135)
     #data.ma_270 = ma(data.sclose,270)
- 
+    
+    #data.hma30 = ma(data.shigh,30)
+    #data.lma30 = ma(data.slow,30)
+    #data.hma60 = ma(data.shigh,60)
+    #data.lma60 = ma(data.slow,60)
+    #data.dlh_10 = rsdiff(data.lma60,data.hma60,10) 
+
 def MA1(data):
     '''
         动态计算基本均线, 1分钟的5/7/10/13/20/30/60/120/135/270均线
@@ -364,6 +464,11 @@ def MA1(data):
     data.ma_13.append(0)
     data.ma_20.append(0)
     data.ma_30.append(0)
+    #data.hma30.append(0)
+    #data.lma30.append(0)
+    #data.hma60.append(0)
+    #data.lma60.append(0)
+    
     #data.ma_60.append(0)
     #data.ma_120.append(0)
     #data.ma_135.append(0)    
@@ -375,12 +480,22 @@ def MA1(data):
     ma1(data.sclose,13,data.ma_13)
     ma1(data.sclose,20,data.ma_20)
     ma1(data.sclose,30,data.ma_30)
+    
+    #ma1(data.shigh,30,data.hma30)
+    #ma1(data.slow,30,data.lma30)
+    #ma1(data.shigh,60,data.hma60)
+    #ma1(data.slow,60,data.lma60)
+    
     #ma1(data.sclose,60,data.ma_60)
     #ma1(data.sclose,120,data.ma_120)
     #ma1(data.sclose,135,data.ma_135)
     #ma1(data.sclose,270,data.ma_270)
     #print u'after:收盘序列长度:%s,ma5序列长度:%s' % (len(data.sclose),len(data.ma_5))
     assert len(data.sclose) == len(data.ma_5),u'sclose序列和ma_5序列长度不同 len(data.sclose)=%s,len(data.ma5)=%s' % (len(data.sclose),len(data.ma_5))
+    #if len(data.hma60)>11:
+    #    data.dlh_10.append(data.lma60[-1] - data.hma60[-11])
+    #else:
+    #    data.dlh_10.append(data.lma60[-1] - data.hma60[0])
 
 def ADX(data,n=14,m=6):
     '''计算ADX
