@@ -9,6 +9,8 @@
     序列函数/动态函数中必须妥善处理输入序列比较短或为空的情况
 '''
 
+from collections import deque
+
 XBASE = 100  #整数运算的放大倍数
 CBASE = XBASE * XBASE #XATR倍数
 FBASE = 10 #整数运算的放大倍数2
@@ -281,8 +283,8 @@ def tmax(source,covered): #最近len个数据的max值
         是其展开版本
     '''
     tm = -99999999
-    rev = [0]*length
     length = len(source)
+    rev = [0]*length
     prelen = length > covered and covered or length
     for i in range(prelen):
         v = source[i]
