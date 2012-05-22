@@ -10,6 +10,7 @@ class ModuleTest(unittest.TestCase):
         self.assertEquals([],xdiff([]))
         self.assertEquals([0,0,1,0,0,-1],xdiff([0,0,1,0,0,-1]))
         self.assertEquals([0,0,1,0,0,-1],xdiff([0,0,1,1,0,-1]))
+        self.assertEquals([0,0,1,0,0,-1],xdiff([0,0,1,0,1,-1]))
         self.assertEquals([0,0,1,0,-1,0],xdiff([0,0,1,1,-1,-1]))
 
     def test_cexpma(self):
