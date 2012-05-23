@@ -1131,7 +1131,7 @@ class Agent(AbsAgent):
             ddata.cur_day.iihigh = 0
             ddata.cur_day.iilow = 0
             ddata.cur_day.weekday = date2week(ctick.date)
-            ddata.cur_day.ibegin = len(ddata.sdate)-1   #最新一个分钟的位置
+            ddata.cur_day.ibegin = len(ddata.sdate)   #最新一个分钟的位置,应当是下一分钟。因为还没保存
         else:
             if ctick.price > ddata.cur_day.vhigh:
                 ddata.cur_day.vhigh = ctick.price   #根据当前价比较得到的最大/最小
