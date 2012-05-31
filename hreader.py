@@ -292,6 +292,7 @@ def prepare_data(instruments,tday,path=DATA_PATH):
                         vlowd = min(tdata.slow[idlast:]),
                         vholding = tdata.sholding[-1],
                         vvolume = tdata.svolume[-1],
+                        weekday = date2week(tdata.sdate[idlast]),
                         ibegin = idlast,    #第一分钟的坐标
                     )
             for i in range(len(tdata.stime)-1,idlast-1,-1):
@@ -317,6 +318,7 @@ def prepare_data(instruments,tday,path=DATA_PATH):
                         iihigh = 0,
                         iilow = 0,
                         ibegin = 0,
+                        weekday = 0,
                     )
         if len(tdata.sdate)>0:
             tdata.cur_min = BaseObject(

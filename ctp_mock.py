@@ -229,7 +229,7 @@ myagent.resume()
 ctp_mock.run_ticks(ticks,myagent)
 
 ##推进
-tday = 20120524
+tday = 20120530
 myagent.day_switch(tday)
 ticks = hreader.read_ticks(instrument,tday)    #不加载当日数据
 ctp_mock.run_ticks(ticks,myagent)
@@ -242,9 +242,9 @@ import hreader
 
 ctp_mock.log_config()
 
-preday = 20120209
-tday = 20120210
-instrument = 'IF1202'
+preday = 20120515
+tday = 20120516
+instrument = 'IF1206'
 myagent = ctp_mock.create_agent_with_mocktrader(instrument,-1,sname='strategy_trader.ini')    #不需要tday的当日数据
 myagent.instruments[instrument].t2order = base.t2order_if
 myagent.scur_day = preday
