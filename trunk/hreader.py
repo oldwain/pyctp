@@ -450,6 +450,7 @@ PREPARER_INST= XPREPARER(SPREPARER)
 def extract_tick(line):
     items = line.split(',')
     rev = BaseObject()
+    rev.sname = items[0]
     rev.date = int(items[1])
     rev.min1 = int(items[2])
     rev.sec = int(items[3])
