@@ -1231,6 +1231,52 @@ class T_LONG_EM2_STOPER(strategy.LONG_STOPER):
         self.pre_m2 = tick.em2
         return sflag,sprice,cflag
 
+class T_LONG_EVP(T_LONG):
+    '''
+        等量/价/时线
+    '''
+    def __init__(self,bid_ticks=3,valid_length=60,mlen1=7,mlen2=13,mlen3=30):
+        T_LONG.__init__(self,bid_ticks,valid_length)
+        self.base_line = 99999999
+        self.mlen1 = mlen1
+        self.mlen2 = mlen2
+        self.mlen3 = mlen3
+        self.pre_m1 = 0
+        self.pre_m2 = 0
+        self.pre_m3 = 0
+
+    def reset(self):
+        pass
+
+    def check(self,data,ctick):
+        tick = ctick
+        
+        if tick.dorder < 8:
+            return False,0,0
+
+        nl3 = self.mlen1
+        nl1 = self.mlen2
+        nl2 = self.mlen3
+
+        ma1 = sum(data.vps[-nl1:])*1.0 / nl1
+        ma2 = sum(data.vps[-nl2:])*1.0 / nl2
+        ma3 = sum(data.vps[-nl3:])*1.0 / nl3
+
+        fire_flag,fire_price,stop_price = False,0,0
+        if ctick.min1 < 1510:
+            #print >>fh,tick.time,tick.msec,mal,mas,mam,n0,n1,n2,ctick.dvolume,data.vols[-n1-1],data.vols[-n2-1]
+            print >>fh,'%s;%s;%s;%s;%s;%s'%(tick.time,tick.msec,ma1,ma2,ma3,tick.price)
+        #print tick.time,self.pre_m1,self.pre_m2,tick.em1,tick.em2
+        if ctick.min1 <= 916 or ctick.min1 >=1500:
+            pass
+        elif ctick.min1 > 945 and ctick.min1 < 1459 and self.pre_m1 < self.pre_m2+2 and ma1 >= ma2+2 and ma2>self.pre_m2:
+            fire_flag,fire_price,stop_price = True,ctick.price,ctick.price-100    #(触发标志、触发价、止损)
+            print 'open',tick.sec,self.pre_m1,self.pre_m2,self.pre_m3,ma1,ma2,ma3,tick.price
+        self.pre_m1 = ma1
+        self.pre_m2 = ma2
+        self.pre_m3 = ma3
+        return fire_flag,fire_price,stop_price
+
 
 class T_LONG_EM3(T_LONG):
     '''
@@ -1666,6 +1712,8 @@ s_tstrategy_c = strategy.STRATEGY('TESTS',T_SHORT_RCOUNT,[T_SHORT_FIXED_STOPER],
 l_m2 = strategy.STRATEGY('DMA2',T_LONG_M2,[T_LONG_M2_STOPER],1,1)
 l_m3 = strategy.STRATEGY('EMA2',T_LONG_EM2,[T_LONG_EM2_STOPER],1,1)
 l_m4 = strategy.STRATEGY('EMA2',T_LONG_EM3,[T_LONG_EM3_STOPER],1,1)
+
+le_m = strategy.STRATEGY('LE',T_LONG_EVP,[T_LONG_MOVING_STOPER],1,1)
 
 ss = strategy.STRATEGY('EMA2',T_LONG_SAVE,[T_LONG_MOVING_STOPER],1,1)
 
