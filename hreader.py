@@ -483,7 +483,7 @@ def read_ticks(instrument,tday=0,length = 36000,extractor=extract_tick,readfunc 
 
 
 class TICK(object):
-    __slots__ = ['sname','instrument','date','min1','sec','msec','time','holding','dvolume','price','high','low','bid_price','bid_volume','ask_price','ask_volume','switch_min','iorder','dorder','dsum','davg']
+    __slots__ = ['sname','instrument','date','min1','sec','msec','time','holding','dvolume','price','high','low','bid_price','bid_volume','ask_price','ask_volume','switch_min','iorder','dorder']
 
 
 
