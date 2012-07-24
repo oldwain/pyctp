@@ -35,6 +35,8 @@ def read_data(filename,extractor=extract_std):
     file.close()
     return read_records(data,extractor)
 
+
+
 def read_data_zip(filename,extractor=extract_std):
     df = zipfile.ZipFile(filename,'r')
     data = df.read(df.namelist()[0])    #只包含一个文件
@@ -51,9 +53,11 @@ def read_records(data,extractor):
     for line in data:
         if len(line.strip()) > 0:
             record = extractor(line)
-            if record.time < 1516 and record.time > 850 or ('min1' in record.__dict__ and record.min1 < 1516 and record.min1 > 850):  #排除错误数据
+            #if record.time < 1516 and record.time > 850 or ('min1' in record.__dict__ and record.min1 < 1516 and record.min1 > 850):  #排除错误数据
+            if record.time < 1516 and record.time > 850 or (record.min1 < 1516 and record.min1 > 850):  #排除错误数据 #20120723
                 records.append(record)
     return records
+
 
 def read_min_as_list(filename,length,extractor=extract_std,readfunc = read_data,t2order=t2order_if):
     try:
@@ -449,7 +453,8 @@ PREPARER_INST= XPREPARER(SPREPARER)
 ##############################################
 def extract_tick(line):
     items = line.split(',')
-    rev = BaseObject()
+    #rev = BaseObject()
+    rev = TICK()
     rev.sname = items[0]
     rev.date = int(items[1])
     rev.min1 = int(items[2])
@@ -475,6 +480,11 @@ def read_ticks(instrument,tday=0,length = 36000,extractor=extract_tick,readfunc 
     for record in records:
         record.instrument = instrument
     return records[-length:]
+
+
+class TICK(object):
+    __slots__ = ['sname','instrument','date','min1','sec','msec','time','holding','dvolume','price','high','low','bid_price','bid_volume','ask_price','ask_volume','switch_min','iorder','dorder','dsum','davg']
+
 
 
 ##############################################
