@@ -1,5 +1,5 @@
+#summary pyctp安装指南
 #labels pyctp,installation
-#pyctp安装指南
 
 = 1.安装python2.6 =
 因接口pyd是用vc2008express链接python2.6编译,故须安装python2.6
@@ -50,5 +50,3 @@ Type "help", "copyright", "credits" or "license" for more information.
 此处安装需要较长时间,视本机操作系统版本和网络速度而定
 
 裸XP系统，需要安装1.1G.
-
-
