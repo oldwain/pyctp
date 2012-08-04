@@ -50,3 +50,21 @@ Type "help", "copyright", "credits" or "license" for more information.
 此处安装需要较长时间,视本机操作系统版本和网络速度而定
 
 裸XP系统，需要安装1.1G.
+
+
+
+= 3. 安装pyctp =
+== 3.1 下载 ==
+在[http://code.google.com/p/pyctp/downloads/list pyctp0.1a]中，下载pyctp_0.1a.zip
+
+== 3.2 安装 ==
+将pyctp_0.1a.zip解压到d:\盘；完成后，d:\pyctp下即为相应程序
+
+将d:\pyctp\bin目录下4个文件复制到 C:\Python26\Lib\site-packages
+
+== 3.3 验证安装 ==
+打开dos窗口, 输入 python, 在随后的提示行中输入:
+
+{{{import _ctp_Md}}}
+
+若未有任何报错信息，则安装成功
