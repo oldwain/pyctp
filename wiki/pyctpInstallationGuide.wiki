@@ -25,10 +25,15 @@ PYTHON_HOME 值为安装目录,即 d:\python26
 == 1.4 测试安装成功 ==
 打开dos窗口, 输入 python
 若回应为
+{{{
 Python 2.6.6 (r266:84297, Aug 24 2010, 18:46:32) [MSC v.1500 32 bit (Intel)] on
+
 win32
+
 Type "help", "copyright", "credits" or "license" for more information.
+
 >>>
+}}}
 
 则表示python2.6安装成功
 
