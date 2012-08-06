@@ -22,22 +22,8 @@ PYTHON_HOME 值为安装目录,即 d:\python26
 
 在Path末尾添加: ;%PYTHON_HOME%\
 
-== 1.4 设定当前python的默认语言 ==
 
-查看D:\Python26\Lib\site-packages下是否存在文件sitecustomize.py
-
-若不存在，则将pyctp安装目录的bin\site-packages下的sitecustomize.py文件复制到D:\Python26\Lib\site-packages
-
-若存在sitecustomize.py，则将
-{{{
-import sys
-sys.setdefaultencoding('gbk')
-}}}
-
-复制到该文件中.
-
-
-== 1.5 测试安装成功 ==
+== 1.4 测试安装成功 ==
 打开dos窗口, 输入 python
 若回应为
 {{{
@@ -80,9 +66,24 @@ Type "help", "copyright", "credits" or "license" for more information.
 == 3.2 安装 ==
 将pyctp_0.1a.zip解压到d:\盘；完成后，d:\pyctp下即为相应程序
 
-将d:\pyctp\bin目录下4个文件复制到 C:\Python26\Lib\site-packages
+将d:\pyctp\bin目录下4个文件(不含子目录)复制到 C:\Python26\Lib\site-packages
 
-== 3.3 验证安装 ==
+== 3.3 设定当前python的默认语言 ==
+
+查看D:\Python26\Lib\site-packages下是否存在文件sitecustomize.py
+
+若不存在，则将pyctp安装目录的bin\site-packages下的sitecustomize.py文件复制到D:\Python26\Lib\site-packages
+
+若存在sitecustomize.py，则将
+{{{
+import sys
+sys.setdefaultencoding('gbk')
+}}}
+
+复制到该文件中.
+
+
+== 3.4 验证安装 ==
 打开dos窗口, 输入 python, 在随后的提示行中输入:
 
 {{{import _ctp_Md}}}
