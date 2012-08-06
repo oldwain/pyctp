@@ -101,6 +101,7 @@ CFs = CF109,CF107
     ...
     '''
     #cfg = ConfigParser.ConfigParser()
+    print name
     cfg = CSParser()
     cfg.read(CONFIG_PATH + name)
     config = base.BaseObject(traces=set([]),traces_raw=set([]))
@@ -126,8 +127,12 @@ CFs = CF109,CF107
     if cfg.has_option('Trade_Config','strategy_file'):#导入策略文件
         sfile = cfg.get('Trade_Config','strategy_file')
         smod = __import__(sfile)
+        mms = sfile.split('.')
+        for mm in mms[1:]:  #找到最终的那个模块，__import__返回的是顶级模块
+            smod = smod.__dict__[mm]
     else:
         smod = strategy
+    #print smod.__dict__.keys()
     config.smodule = smod
     config.strategy = {}
     for ti in trace_instruments:

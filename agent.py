@@ -614,12 +614,12 @@ class TraderSpiDelegate(TraderSpi):
 
 class c_instrument(object):
     @staticmethod
-    def create_instruments(names,strategy):
+    def create_instruments(names,strategy,t2order=t2order_if):
         '''根据名称序列和策略序列创建instrument
            其中策略序列的结构为:
            [总最大持仓量,策略1,策略2...] 
         '''
-        objs = dict([(name,c_instrument(name)) for name in names])
+        objs = dict([(name,c_instrument(name,t2order=t2order)) for name in names])
         for item in strategy.values():
             if item.name not in objs:
                 logging.warning(u'策略针对合约%s不在盯盘列表中' % (item.name,))
@@ -632,7 +632,7 @@ class c_instrument(object):
             objs[item.name].initialize_positions()
         return objs
 
-    def __init__(self,name):
+    def __init__(self,name,t2order = t2order_if):
         self.name = name
         #保证金率
         self.marginrate = (0,0) #(多,空)
@@ -659,7 +659,8 @@ class c_instrument(object):
         #其中tdata.m1/m3/m5/m15/m30/d1为不同周期的数据
         #   tdata.cur_min是当前分钟的行情，包括开盘,最高,最低,当前价格,持仓,累计成交量
         #   tdata.cur_day是当日的行情，包括开盘,最高,最低,当前价格,持仓,累计成交量, 其中最高/最低有两类，一者是tick的当前价集合得到的，一者是tick中的最高/最低价得到的
-        self.t2order = t2order_if if hreader.is_if(self.name) else t2order_com
+        #self.t2order = t2order_if if hreader.is_if(self.name) else t2order_com
+        self.t2order = t2order
         ##模拟的在外面解决
         #if int(time.strftime('%H%M%S')) > 170000:   #模拟
         #    self.t2order = t2order_mock
@@ -698,7 +699,7 @@ class c_instrument(object):
         '''
         #print self.name,self.marginrate[0],self.marginrate[1],self.multiple
         my_marginrate = self.marginrate[0] if direction == LONG else self.marginrate[1]
-        #print 'self.name=%s,price=%s,multiple=%s,my_marginrate=%s' % (self.name,price,self.multiple,my_marginrate)
+        print 'self.name=%s,price=%s,multiple=%s,my_marginrate=%s' % (self.name,price,self.multiple,my_marginrate)
         if self.name[:2].upper() == 'IF':
             #print 'price=%s,multiple=%s,my_marginrate=%s' % (price,self.multiple,my_marginrate)
             return price / 10.0 * self.multiple * my_marginrate * 1.05  #避免保证金问题
@@ -782,7 +783,7 @@ class AbsAgent(object):
 class Agent(AbsAgent):
     logger = logging.getLogger('ctp.agent')
 
-    def __init__(self,trader,cuser,instruments,strategy_cfg,tday=0):
+    def __init__(self,trader,cuser,instruments,strategy_cfg,tday=0,t2order=t2order_if):
         '''
             trader为交易对象
             tday为当前日,为0则为当日
@@ -797,7 +798,8 @@ class Agent(AbsAgent):
         self.cuser = cuser
         self.strategy_cfg = strategy_cfg
         self.strategy = strategy_cfg.strategy
-        self.instruments = c_instrument.create_instruments(instruments,self.strategy)
+        self.t2order = t2order
+        self.instruments = c_instrument.create_instruments(instruments,self.strategy,t2order=t2order)
         self.request_id = 1
         self.initialized = False
         self.data_funcs = []  #计算函数集合. 如计算各类指标, 顺序关系非常重要
@@ -1262,8 +1264,10 @@ class Agent(AbsAgent):
             return 0
         margin_amount = instrument.calc_margin_amount(order.target_price,order.position.strategy.direction)
         logging.info(u'A_COV2:理论开仓数:%s,单手保证金:%s' % (want_volume,margin_amount))
+
         if margin_amount <= 1:#不可能只有1块钱
             logging.error(u'合约%s保证金率未初始化' % (instrument.name,))
+            return 0
         available_volume = int(self.available / margin_amount)
         logging.debug(u'A_COV3:可用保证金=%s,单手保证金=%s' % (int(self.available),margin_amount))
         if available_volume == 0:
@@ -1585,6 +1589,7 @@ class Agent(AbsAgent):
             return
         self.instruments[pinstrument.InstrumentID].multiple = pinstrument.VolumeMultiple
         self.instruments[pinstrument.InstrumentID].tick_base = int(pinstrument.PriceTick * 10 + 0.1)
+        #print 'tick_base = %s' % (pinstrument.PriceTick,)
         self.check_qry_commands()
 
     def rsp_qry_position_detail(self,position_detail):
@@ -1636,7 +1641,7 @@ class SaveAgent(Agent):
             获得合约名称
         '''
         if pinstrument.InstrumentID not in self.instruments:
-            self.instruments[pinstrument.InstrumentID] = c_instrument(pinstrument.InstrumentID)
+            self.instruments[pinstrument.InstrumentID] = c_instrument(pinstrument.InstrumentID,t2order=self.t2order)
 
 
 def make_user(my_agent,hq_user,name='data'):
@@ -1727,7 +1732,7 @@ def save2():
     return save(base_name='mybase.ini')
 
 
-def create_trader(name='base.ini',base='Base',sname='strategy.ini'):
+def create_trader(name='base.ini',base='Base',sname='strategy.ini',t2order=t2order_if):
     logging.basicConfig(filename="ctp_trade.log",level=logging.DEBUG,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')
     
     trader = TraderApi.CreateTraderApi("trader")
@@ -1740,7 +1745,7 @@ def create_trader(name='base.ini',base='Base',sname='strategy.ini'):
     logging.info(u'broker_id=%s,investor_id=%s,passwd=%s' % (cuser.broker_id,cuser.investor_id,cuser.passwd))
 
     instruments = list(strategy_cfg.traces_raw)
-    myagent = Agent(trader,cuser,instruments,strategy_cfg) 
+    myagent = Agent(trader,cuser,instruments,strategy_cfg,t2order=t2order) 
     myspi = TraderSpiDelegate(instruments=myagent.instruments, 
                              broker_id=cuser.broker_id,
                              investor_id= cuser.investor_id,
