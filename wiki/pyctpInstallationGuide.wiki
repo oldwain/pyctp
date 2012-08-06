@@ -26,7 +26,7 @@ PYTHON_HOME 值为安装目录,即 d:\python26
 
 查看D:\Python26\Lib\site-packages下是否存在文件sitecustomize.py
 
-若不存在，则将pyctp安装目录的bin下的sitecustomize.py文件复制到D:\Python26\Lib\site-packages
+若不存在，则将pyctp安装目录的bin\site-packages下的sitecustomize.py文件复制到D:\Python26\Lib\site-packages
 
 若存在sitecustomize.py，则将
 {{{
