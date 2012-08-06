@@ -273,6 +273,8 @@ class LONG_BREAK(BREAK):    #多头突破策略
     def calc_target_price(self,base_price,tick_base):    #计算开单加价
         logging.info(u'LB_CTP:base_price=%s' % base_price)
         base_price = int(base_price)
+        if tick_base == 0:  #还未初始化
+            return base_price + 100
         if base_price % tick_base > 0:  #取整
             base_price = (base_price / tick_base + 1) * tick_base 
         return base_price + tick_base * self.max_overflow
@@ -287,6 +289,8 @@ class SHORT_BREAK(BREAK):   #空头突破策略
     def calc_target_price(self,base_price,tick_base):#计算开仓加价
         logging.info(u'SB_CTP:base_price=%s' % base_price)
         base_price = int(base_price)
+        if tick_base == 0:  #还未初始化
+            return base_price - 100
         if base_price % tick_base > 0:
             base_price = (base_price / tick_base - 1) * tick_base
         return base_price - tick_base * self.max_overflow
@@ -403,9 +407,14 @@ class DATR_LONG_STOPER(LONG_STOPER):#日ATR多头止损
         self.thigh = bline
         self.ticks = 0
         self.name = u'多头日ATR止损,初始止损=%s,保本=%s,最大回撤=%s' % (rbase,rkeeper,rdrawdown)
-        self.max_drawdown = int(data.atrd1[-1] * rdrawdown / CBASE + 0.5)
-        self.keeper = int(data.atrd1[-1] * rkeeper / CBASE + 0.5)
-        self.set_cur_stop(bline - int(data.atrd1[-1] * rbase / CBASE + 0.5))
+        if data.atrd1:
+            self.max_drawdown = int(data.atrd1[-1] * rdrawdown / CBASE + 0.5)
+            self.keeper = int(data.atrd1[-1] * rkeeper / CBASE + 0.5)
+            self.set_cur_stop(bline - int(data.atrd1[-1] * rbase / CBASE + 0.5))
+        else:
+            self.max_drawdown = data.cur_day.vopen /250
+            self.keeper = int(self.max_drawdown * rkeeper / rdrawdown + 0.5)
+            self.set_cur_stop(bline - int(self.max_drawdown*rbase/rdrawdown))
         logging.info(u'设定止损: max_drawdown=%s,keeper=%s,cur_stop=%s' % (self.max_drawdown,self.keeper,self.get_cur_stop()))
 
     def check(self,tick):
@@ -433,10 +442,15 @@ class DATR_SHORT_STOPER(SHORT_STOPER):#日ATR空头止损
         self.tlow = bline
         self.itime = len(self.data.sclose)  #time的索引，用于计算耗时
         self.name = u'空头日ATR止损,初始止损=%s,保本=%s,最大回撤=%s' % (rbase,rkeeper,rdrawdown)
-        self.max_drawdown = int(data.atrd1[-1] * rdrawdown / CBASE + 0.5)
-        self.keeper = int(data.atrd1[-1] * rkeeper / CBASE + 0.5)
-        self.set_cur_stop(bline + int(data.atrd1[-1] * rbase / CBASE + 0.5))
-
+        if data.atrd1:
+            self.max_drawdown = int(data.atrd1[-1] * rdrawdown / CBASE + 0.5)
+            self.keeper = int(data.atrd1[-1] * rkeeper / CBASE + 0.5)
+            self.set_cur_stop(bline + int(data.atrd1[-1] * rbase / CBASE + 0.5))
+        else:
+            self.max_drawdown = data.cur_day.vopen /250
+            self.keeper = int(self.max_drawdown * rkeeper / rdrawdown + 0.5)
+            self.set_cur_stop(bline + int(self.max_drawdown*rbase/rdrawdown))
+            
     def check(self,tick):
         '''
             必须返回(平仓标志, 基准价,stop变化标志)

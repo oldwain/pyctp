@@ -371,6 +371,22 @@ def comp_real(base_name='mybase.ini',base='Base',strategy_name='strategy_trader.
     
     return myagent
 
+def comp_real2(base_name='mybase.ini',base='Base',strategy_name='strategy_trader.ini',t2order=t2order_if):
+    ''' 实际交易
+    '''
+    logging.basicConfig(filename="ctp_comp_real.log",level=logging.INFO,format='%(name)s:%(funcName)s:%(lineno)d:%(asctime)s %(levelname)s %(message)s')    
+    #tday = int(time.strftime('%Y%m%d'))
+    #myagent = create_agent_with_mocktrader(instrument,tday)    #不需要tday的当日数据
+    trader,myagent = agent.create_trader(name=base_name,base=base,sname=strategy_name,t2order=t2order)
+
+    myagent.resume()
+
+    #用实际行情
+    base_cfg = config.parse_base(base_name,base)
+    for user in base_cfg.users:
+        agent.make_user(myagent,base_cfg.users[user],user)
+    
+    return myagent
 
 
 if __name__ == '__main__':
