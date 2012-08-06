@@ -22,7 +22,22 @@ PYTHON_HOME 值为安装目录,即 d:\python26
 
 在Path末尾添加: ;%PYTHON_HOME%\
 
-== 1.4 测试安装成功 ==
+== 1.4 设定当前python的默认语言 ==
+
+查看D:\Python26\Lib\site-packages下是否存在文件sitecustomize.py
+
+若不存在，则将pyctp安装目录的bin下的sitecustomize.py文件复制到D:\Python26\Lib\site-packages
+
+若存在sitecustomize.py，则将
+{{{
+import sys
+sys.setdefaultencoding('gbk')
+}}}
+
+复制到该文件中.
+
+
+== 1.5 测试安装成功 ==
 打开dos窗口, 输入 python
 若回应为
 {{{
