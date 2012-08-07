@@ -3,10 +3,25 @@
 
 首先请确保pyctp安装成功
 
-= 1.行情保存 =
+= 1.行情记录 =
+采用demo_base.ini；有效节为[Base]
+
+行情记录设定了GF期货的两个行情链接，
+
+为避免拥堵，请设定为开户期货公司的行情链接；
+
+只需要到期货公司网站下载快期客户端，从其brokers.xml的Server->MarketData中可找到相应链接信息，从broker定义中可找到BrokerID；
 
 
 = 2.模拟交易 =
+采用demo_base.ini；有效节为[Base_Mock]
+
+请更改[SQ_TRADER下]模拟交易链接的相关设定，包括investor_id和passwd，设定为从上期申请的用户名和口令；
+
+必要时，请修改相应的port和broker_id；我申请到的第二个ID的broker_id是4030
 
 
 = 3.真实交易 =
+采用demo_base.ini；有效节为[Base_Real]
+
+请填充[REAL_TRADER下]交易链接的相关设定；设置为真实交易配置信息；
