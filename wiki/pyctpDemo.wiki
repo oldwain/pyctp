@@ -1,7 +1,10 @@
-#summary pyctp Demo指南
+#summary pyctp Demo & Configuration指南
 #labels pyctp,demo
 
+首先请确保pyctp安装成功
+
 = 1.行情保存 =
+
 
 
 = 2.模拟交易 =
