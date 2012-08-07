@@ -19,6 +19,9 @@ def trade_demo():
     return ctp_mock.comp_real2(base_name='demo_base.ini',strategy_name='demo_strategy_trade.ini')
 
 def trade_mock(t2order = t2order_mock):
+    '''
+        交易时间请使用trade_mock(t2order=entry.t2order_if)
+    '''
     return ctp_mock.comp_real2(base_name='demo_base.ini',base='Base_Mock',strategy_name='demo_strategy_trade.ini',t2order=t2order)
 
 
