@@ -374,6 +374,7 @@ class TraderSpiDelegate(TraderSpi):
         self.logger.debug(u"TD:loggin %s" % str(pRspInfo))
         if not self.isRspSuccess(pRspInfo):
             self.logger.warning(u'TD:trader login failed, errMsg=%s' %(pRspInfo.ErrorMsg,))
+            print u'综合交易平台登陆失败，请检查网络或用户名/口令'
             self.is_logged = False
             return
         self.is_logged = True
