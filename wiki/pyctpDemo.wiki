@@ -18,7 +18,7 @@
 = 2.模拟交易 =
 程序入口: my.entry.trade_mock()
 
-基础配置采用demo_base.ini；有效节为Base_Mock
+基础配置采用demo_base.ini；有效节为Base_Mock；
 
 请更改[SQ_TRADER下]模拟交易链接的相关设定，包括investor_id和passwd，设定为从上期申请的用户名和口令；
 
@@ -35,7 +35,7 @@
 = 3.真实交易 =
 程序入口: my.entry.trade_demo()
 
-采用demo_base.ini；有效节为Base_Real
+采用demo_base.ini；有效节为Base_Real；
 
 请填充[REAL_TRADER下]交易链接的相关设定；设置为真实交易配置信息；
 
