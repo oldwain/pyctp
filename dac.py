@@ -130,7 +130,7 @@ def cmacd(source,ifast=12,islow=26,idiff=9):
     return sfast,sslow,sdiff,sdea
 
 def cmacd1(source,target_fast,target_slow,target_dea,ifast=12,islow=26,idiff=9):
-    if len(source)<1:
+    if len(source)<2:
         return 0
     assert len(source) == len(target_fast),u'源序列与fast目标序列长度不相等,%s:%s' % (len(source),len(target_fast))
     assert len(source) == len(target_slow),u'源序列与slow目标序列长度不相等,%s:%s' % (len(source),len(target_slow))
