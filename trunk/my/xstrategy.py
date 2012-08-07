@@ -24,10 +24,11 @@ class min_long_break(LONG_BREAK):#每分钟触发
 
 class day_long_stoper_35(LONG_STOPER):#触发后当分钟结束平仓
     def check(self,ctick):
-        print 'ctick.min1 = %s' % (ctick.min1,)
+        print 'DLS35A:ctick.min1 = %s' % (ctick.min1,)
         #print u'in check,%s:%s:%s' % (ctick.min1,ctick.sec,ctick.msec)
         #if ctick.min1 % 100 == 30 and ctick.sec>58 and ctick.msec==0:
         if ctick.sec==59 or ctick.min1>1500:# and ctick.msec ==0:
+            print u'S:day_long_stoper_35:发出多头平仓信号=%s:%s %s' % (ctick.min1,ctick.sec,ctick.msec)
             logging.info(u'S:day_long_stoper_35:发出多头平仓信号=%s:%s %s' % (ctick.min1,ctick.sec,ctick.msec))
             return (True,ctick.low,False)
         return (False,0,False)
