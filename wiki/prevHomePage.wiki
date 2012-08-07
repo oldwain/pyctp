@@ -1,4 +1,4 @@
-#summary 原首页介绍
+#summary 原首页
 
 因为是完全DIY项目, 只建议C/PYTHON码农观摩使用; 非马农请勿自寻烦恼;
 
