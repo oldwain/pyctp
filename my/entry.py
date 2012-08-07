@@ -12,11 +12,14 @@ import agent
         demo_strategy.ini   配置须保存ticks的合约
 '''
 def save_demo():
-    return agent.save_raw(base_name='demo_base.ini',strategy_name='demo_strategy.ini')
+    return agent.save_raw(base_name='demo_base.ini',base='Base',strategy_name='demo_strategy.ini')
 
 
 def trade_demo():
-    return ctp_mock.comp_real2(base_name='demo_base.ini',strategy_name='demo_strategy_trade.ini')
+    '''
+        请先在demo_base.ini中的[REAL_TRADER]下设定相关细节
+    '''
+    return ctp_mock.comp_real2(base_name='demo_base.ini',base='Base_Real',strategy_name='demo_strategy_trade.ini')
 
 def trade_mock(t2order = t2order_mock):
     '''
