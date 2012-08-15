@@ -443,14 +443,16 @@ def cruiser1(rtts,tfuncs):
         for j in range(len(tfuncs)):
             tss[j].extend(ss[j].trades)
             #print u'id(tss[j])=%s,j=%s,tss[j]=%s' % (id(tss[j]),j,tss[j])
-    for tfunc,ts in zip(tfuncs,tss):
+    rtss = zip(tfuncs,tss)
+    for tfunc,ts in rtss:
         print tfunc.name
         Trade.print_info(ts)
     print u'耗时:%s' % (time.time()-tbegin,)
-    return tss
+    return rtss
 
 
 '''
+方式一:
 In [1]: import bktest
 
 In [2]: rtt1 = bktest.TickAgent('IFXXXX')
@@ -460,4 +462,14 @@ In [3]: rtt1.load()
 In [4]: ss = rtt1.run([bktest.l_ema_sm],tend=20190713)
 
 In [5]: bktest.Trade.print_info(ss[0].trades)
+
+方式二:(推荐，可以直接使用多个合约
+In [1]: import bktest
+
+In [2]: rtts = hktest.load_all(['IF1206','IF1207'])
+
+In [3]: ss = bktest.cruiser1(rtts,[bktest.l_ema_sm])
+
+In [4]: bktest.Trade.print_info(ss[0][1])
+
 '''
