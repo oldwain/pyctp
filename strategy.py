@@ -246,6 +246,9 @@ class Resumable(object):#可中间恢复
         logging.info(u'Resumable数据恢复中....')
         pass
 
+    def dreset(self):   #日初始化动作,每日开始时系统调用,目前未实现, 目前的方式是每天初始化一个新的opener,但这样实现跨日状态就有点脱裤子放X
+        pass
+
 
 ###突破类策略
 ###突破类策略以当前价为基准价，以一定额度的加价作为开仓限价以确保开仓，同时根据基准价来计算止损

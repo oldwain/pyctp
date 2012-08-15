@@ -27,6 +27,14 @@ XBASE = 100  #整数运算的放大倍数
 CBASE = XBASE * XBASE #XATR倍数
 FBASE = 10 #整数运算的放大倍数2
 
+##########
+#编写指标时，请务必确保这个判断中的标识字符串和下面赋值的名称的一致性，否则会每次都赋值和计算，内存立马挂掉
+#    if not hasattr(_ts,'ss'):
+#       _ts.ss = []
+#
+##########
+
+
 ###############
 # 基本序列运算
 #
@@ -60,6 +68,7 @@ def OPER2(source1,source2,oper,_ts=None):
     '''
     assert len(source1) == len(source2),'len(source1) != len(source2)'
     if not hasattr(_ts,'ss'):
+        print 'new oper2 ss'
         _ts.ss = []
 
     for i in range(len(_ts.ss),len(source1)):
@@ -228,7 +237,7 @@ def MA(source,mlen,_ts=None):
         当序列中元素个数<mlen时，结果序列为到该元素为止的所有元素值的平均
     '''
     assert mlen>0,u'mlen should > 0'
-    if not hasattr(_ts,'sa'):
+    if not hasattr(_ts,'ma'):
         _ts.ma = []
 
     ms = MSUM(source,mlen)
@@ -248,7 +257,7 @@ def MA_2(source,mlen,_ts=None):
         当序列中元素个数<mlen时，结果序列为到该元素为止的所有元素值的平均
     '''
     assert mlen>0,u'mlen should > 0'
-    if not hasattr(_ts,'sa'):
+    if not hasattr(_ts,'ma'):
         _ts.sa = [0]*mlen   #哨兵
         _ts.ma = []
 
@@ -271,7 +280,7 @@ def NMA(source,_ts=None):
         使用方式:
         rev = MA(source) #返回source的当期及之前的平均值
     '''
-    if not hasattr(_ts,'sa'):
+    if not hasattr(_ts,'nma'):
         _ts.sa = [0]   #哨兵
         _ts.nma = []
 
@@ -291,7 +300,8 @@ def CEXPMA(source,mlen,_ts=None):
     if len(source) == 0:#不计算空序列，直接返回
         return []
 
-    if not hasattr(_ts,'sa'):
+    if not hasattr(_ts,'ema'):
+        print 'new cexpma ema'
         _ts.ema = [source[0]]   #哨兵元素是source[0]，确保计算得到的值在<mlen元素的情况下也正确
 
     cur = _ts.ema[-1]
@@ -380,7 +390,9 @@ def TMM(source,covered,vmm,fcmp,fgroup,_ts=None):
         return []
 
     if not hasattr(_ts,'tmm'):
+        print 'new tmm'
         _ts.tmm = []    #第一个是无趋势
+        _ts.buffer = None
 
     slen = len(source)
     pre_len = slen if slen <= covered else covered
@@ -392,7 +404,11 @@ def TMM(source,covered,vmm,fcmp,fgroup,_ts=None):
     if slen <= covered:
         return _ts.tmm
     tlen = len(_ts.tmm)
-    buffer = deque(source[tlen-covered:tlen])  
+    if _ts.buffer:
+        buffer = _ts.buffer
+    else:
+        buffer = _ts.buffer = deque(source[tlen-covered:tlen])  
+    #print 'in tmm:tlen=%s,len(source)=%s' % (tlen,len(source))
     for i in range(tlen,len(source)):
         v = source[i]
         buffer.append(v)
@@ -400,7 +416,8 @@ def TMM(source,covered,vmm,fcmp,fgroup,_ts=None):
         if fcmp(v,cmm):
             cmm = v
         if cmm == vquit and v != cmm: #退出的正好是最大值,计算前covered-1个元素的最大值, pre=source[i-1]
-            cmm = fgroup(source[i-covered+1:i+1])
+            #cmm = fgroup(source[i-covered+1:i+1])
+            cmm = fgroup(buffer)
         _ts.tmm.append(cmm)
     return _ts.tmm
 
