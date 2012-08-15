@@ -418,8 +418,8 @@ class T_SHORT_MOVING_STOPER(strategy.SHORT_STOPER):
 
 l_ema_sm = strategy.STRATEGY('EMA_SM',T_LONG_EC,[T_LONG_MOVING_STOPER],1,1)
 
-def load_all(rtts=('IF1206','IF1207')):
-    for sii in IFS:
+def load_all(ifs=('IF1206','IF1207')):
+    for sii in ifs:
         rtt = TickAgent(sii)
         rtt.load()
         rtts.append(rtt)
