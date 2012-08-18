@@ -268,11 +268,8 @@ class DTicks(object):#日tick结构
 
 
 #############
-#   策略基类
-#
+#  策略基类
 #############
-
-
 class T_LONG(strategy.BREAK):
     direction = LONG
     def __init__(self,bid_ticks=3,valid_length=60):
@@ -306,20 +303,16 @@ class T_SHORT(strategy.BREAK):
 
 #############
 # 策略示例
-#
 #############
-
 class T_LONG_EC(T_LONG):
     '''
         EMA通道
     '''
-    def __init__(self,bid_ticks=3,valid_length=10,rlen=10,elen=20):
+    def __init__(self,bid_ticks=3,valid_length=10,rlen=10):
         T_LONG.__init__(self,bid_ticks,valid_length)
         self.base_line = 99999999
         self.rlen = rlen
-        self.elen = elen
         self.ema = None
-        self.pre_rlow = 0
         self.pre_tick = None
 
     def dreset(self):
@@ -349,7 +342,6 @@ class T_LONG_EC(T_LONG):
 
 ###########
 #  止损示例
-#
 ###########
 class T_LONG_MOVING_STOPER(strategy.LONG_STOPER):
     def __init__(self,data,bline,max_overflow=strategy.MAX_CLOSE_OVERFLOW,valid_length=strategy.STOP_VALID_LENGTH,opened=None,tick_base=2,base_lost=10):
@@ -466,7 +458,7 @@ In [5]: bktest.Trade.print_info(ss[0].trades)
 方式二:(推荐，可以直接使用多个合约
 In [1]: import bktest
 
-In [2]: rtts = hktest.load_all(['IF1206','IF1207'])
+In [2]: rtts = bktest.load_all(['IF1206','IF1207'])
 
 In [3]: ss = bktest.cruiser1(rtts,[bktest.l_ema_sm])
 
