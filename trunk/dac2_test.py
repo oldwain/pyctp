@@ -208,6 +208,20 @@ class ModuleTest(unittest.TestCase):
         self.assertEquals([0,0,1,0,0,0,0,1,0,0,1,0,0,1],UPCROSS(target,follow))
         self.assertEquals([1,0,0,0,0,0,1,0,1,0,0,0,1,0],DOWNCROSS(target,follow))
 
+    def test_ref(self):
+        self.assertEquals([],REF([]))
+        a= [1,2,3,4,5,6,7,8,9,0]
+        self.assertEquals([1,2,3,4,5,6,7,8,9,0],REF(a,0))
+        self.assertEquals([1,1,2,3,4,5,6,7,8,9],REF(a,1))
+        self.assertEquals([1,1,1,2,3,4,5,6,7,8],REF(a,2))
+        self.assertEquals([1,1,1,1,1,1,1,1,1,2],REF(a,8))
+        self.assertEquals([1,1,1,1,1,1,1,1,1,1],REF(a,9))
+        self.assertEquals([1,1,1,1,1,1,1,1,1,1],REF(a,10))
+        self.assertEquals([1,1,1,1,1,1,1,1,1,1],REF(a,11))
+        self.assertEquals([1,1,1,1,1,1,1,1,1,1],REF(a,100))
+        a.append(100)
+        self.assertEquals([1,1,1,2,3,4,5,6,7,8,9],REF(a,2))
+
 
 
 if __name__ == "__main__":

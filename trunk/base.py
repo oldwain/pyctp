@@ -239,7 +239,7 @@ def _icache(func, *args, **kw):
     slen = source_len(key)
     if vkey not in cache or cache[vkey].slen < slen:
         result = func(*args, **kw)
-        cache[vkey] = BaseObject(result = result,slen = slen,vobjs = vobjs)
+        cache[vkey] = BaseObject(result = result,slen = slen,vobjs = vobjs,initialized=False)
     elif slen > cache[vkey].slen:#须重新计算
         cache[vkey].result = func(*args, **kw)
         cache[vkey].slen = slen
@@ -264,7 +264,7 @@ def _indicator(func, *args, **kw):
     slen = source_len(key)
     if vkey not in storage:
         #storage[vkey] = BaseObject()
-        storage[vkey] = BaseObject()
+        storage[vkey] = BaseObject(initialized = False)
         GLOBAL_HOLDER.register_objs(vobjs)
     #print vargs
     #指标调用者直接指定_ts(用位置或命名参数)时，仍然将其替换为暂存者. 要求调用者不得指定这个参数，否则会导致莫名奇妙问题
@@ -299,7 +299,8 @@ def MA_EXAMPLE(src,mlen,_ts=None):
             当序列中元素个数<mlen时，结果序列为到该元素为止的所有元素值的平均
     '''
     assert mlen>0,u'mlen should > 0'
-    if not hasattr(_ts,'sa'):
+    if not _ts.initialized:
+        _ts.initialized = True
         _ts.sa = [0]*mlen   #哨兵
         _ts.ma = []
 

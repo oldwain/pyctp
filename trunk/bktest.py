@@ -70,6 +70,7 @@ class TickAgent(object):#ticks数据管理,只管理一个合约,并最多测试
         env.cur_inst = BaseObject(cur_day=BaseObject(vhigh=0,vlow=99999999),
                                                      ticks=[],
                                                      prices=[],
+                                                     dvols=[],
                                                      vols=[],
                                                      bids=[],
                                                      asks=[],
@@ -91,7 +92,8 @@ class TickAgent(object):#ticks数据管理,只管理一个合约,并最多测试
             env.iorder += 1
             env.cur_inst.ticks.append(ctick)
             env.cur_inst.prices.append(ctick.price)
-            env.cur_inst.vols.append(ctick.dvolume)
+            env.cur_inst.dvols.append(ctick.dvolume)
+            env.cur_inst.vols.append(ctick.dvolume - pre_tick.dvolume if pre_tick else ctick.dvolume)
             env.cur_inst.bids.append(ctick.bid_price)
             env.cur_inst.asks.append(ctick.ask_price)
             env.cur_inst.vbid.append(ctick.bid_volume)
@@ -239,6 +241,16 @@ class Trade(object):
         for trade in trades:
             print '%s::open:%s-%s-%s:%s-%s-%s::%s::close:%s:%s' % (trade.get_profit(),trade.open_tick.date,trade.open_tick.time%1000000,trade.open_tick.msec,trade.open_tick.iorder,trade.open_base_price,trade.open_price,trade.open_deal_tick.time%1000000,trade.close_tick.time%1000000,trade.close_price)
             sprofit += trade.get_profit()
+            stimes += 1
+        print 'times=%s,profit=%s' %(stimes,sprofit)
+
+    @staticmethod
+    def print_info2(trades):
+        sprofit = 0
+        stimes = 0
+        for trade in trades:
+            print '%s::open:%s-%s-%s:%s-%s-%s::%s::close:%s:%s' % (trade.get_profit(),trade.open_tick.date,trade.open_tick.time%1000000,trade.open_tick.msec,trade.open_tick.iorder,trade.open_base_price,trade.open_price,trade.open_deal_tick.time%1000000,trade.close_tick.time%1000000,trade.close_price)
+            sprofit += trade.get_profit2()
             stimes += 1
         print 'times=%s,profit=%s' %(stimes,sprofit)
 
@@ -419,18 +431,18 @@ def load_all(ifs=('IF1206','IF1207')):
     return rtts
 
 
-def cruiser1(rtts,tfuncs):
+def cruiser1(rtts,tfuncs,tbegin=0,tend=99999999):
     '''
         计算策略集合tfuncs
     '''
     if not isinstance(tfuncs,list):
         tfuncs = [tfuncs]
-    tbegin = time.time()
+    sbegin = time.time()
     tss = [list() for v in tfuncs]  #[[]]*len(tfuncs)是浅复制,n个元素实际上指向同一个
     #print 'ids:',id(tss[0]),id(tss[1])
     for i in range(len(rtts)):
         rtt = rtts[i]
-        ss = rtt.run(tfuncs,tend=20190713)
+        ss = rtt.run(tfuncs,tbegin=tbegin,tend=tend)
         #print u'i=%s' % (i,)
         for j in range(len(tfuncs)):
             tss[j].extend(ss[j].trades)
@@ -439,7 +451,7 @@ def cruiser1(rtts,tfuncs):
     for tfunc,ts in rtss:
         print tfunc.name
         Trade.print_info(ts)
-    print u'耗时:%s' % (time.time()-tbegin,)
+    print u'耗时:%s' % (time.time()-sbegin,)
     return rtss
 
 
