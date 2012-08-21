@@ -11,9 +11,10 @@ from collections import (
     )
 
 from base import (
+        BaseObject,
+        fcustom,
         indicator,
         icache,
-        fcustom,
     )
 
 from dac import (
@@ -45,7 +46,8 @@ def OPER1(source,oper,_ts=None):
     '''
         单参数序列运算
     '''
-    if not hasattr(_ts,'ss'):
+    if not _ts.initialized:
+        _ts.initialized = True
         _ts.ss = []
 
     for i in range(len(_ts.ss),len(source)):
@@ -67,8 +69,9 @@ def OPER2(source1,source2,oper,_ts=None):
         双参数序列运算
     '''
     assert len(source1) == len(source2),'len(source1) != len(source2)'
-    if not hasattr(_ts,'ss'):
-        print 'new oper2 ss'
+    if not _ts.initialized:
+        _ts.initialized = True
+        #print 'new oper2 ss'
         _ts.ss = []
 
     for i in range(len(_ts.ss),len(source1)):
@@ -94,7 +97,8 @@ def OPER21(source1,vs,oper,_ts=None):
     '''
         双参数运算，第一个为序列，第二个为数值
     '''
-    if not hasattr(_ts,'ss'):
+    if not _ts.initialized:
+        _ts.initialized = True
         _ts.ss = []
 
     for i in range(len(_ts.ss),len(source1)):
@@ -121,7 +125,8 @@ def AND(source1,source2,_ts=None):
         双序列参数AND运算
     '''
     assert len(source1) == len(source2),'len(source1) != len(source2)'
-    if not hasattr(_ts,'ss'):
+    if not _ts.initialized:
+        _ts.initialized = True
         _ts.ss = []
 
     for i in range(len(_ts.ss),len(source1)):
@@ -134,7 +139,8 @@ def AND(source1,source2,_ts=None):
 @indicator
 def GAND(_ts=None,*args):
     assert len(args)>0,'GAND params number less than 1'
-    if not hasattr(_ts,'ga'):
+    if not _ts.initialized:
+        _ts.initialized = True
         _ts.ga = []
 
     for i in range(len(_ts.ga),len(args[0])):
@@ -147,7 +153,8 @@ def GAND(_ts=None,*args):
 def GOR(_ts=None,*args):
     assert len(args)>0,'GOR params number less than 1'
     #print 'ts=%s,args=%s' % (_ts,args)
-    if not hasattr(_ts,'gor'):
+    if not _ts.initialized:
+        _ts.initialized = True
         _ts.gor = []
 
     for i in range(len(_ts.gor),len(args[0])):
@@ -166,7 +173,8 @@ def DIV(source1,source2,_ts=None):
         序列除法
     '''
     assert len(source1) == len(source2),'len(source1) != len(source2)'
-    if not hasattr(_ts,'ss'):
+    if not _ts.initialized:
+        _ts.initialized = True
         _ts.ss = []
 
     for i in range(len(_ts.ss),len(source1)):
@@ -182,7 +190,8 @@ def DIV1(source1,vs,_ts=None):
         序列除常数
     '''
     assert vs!=0,'divisor vs == 0'
-    if not hasattr(_ts,'ss'):
+    if not _ts.initialized:
+        _ts.initialized = True
         _ts.ss = []
 
     for i in range(len(_ts.ss),len(source1)):
@@ -218,7 +227,8 @@ def MSUM(source,mlen,_ts=None):
     '''
         移动求和
     '''
-    if not hasattr(_ts,'ms'):
+    if not _ts.initialized:
+        _ts.initialized = True
         _ts.ms = []
 
     ss = ACCUMULATE(source)
@@ -237,7 +247,8 @@ def MA(source,mlen,_ts=None):
         当序列中元素个数<mlen时，结果序列为到该元素为止的所有元素值的平均
     '''
     assert mlen>0,u'mlen should > 0'
-    if not hasattr(_ts,'ma'):
+    if not _ts.initialized:
+        _ts.initialized = True
         _ts.ma = []
 
     ms = MSUM(source,mlen)
@@ -257,7 +268,8 @@ def MA_2(source,mlen,_ts=None):
         当序列中元素个数<mlen时，结果序列为到该元素为止的所有元素值的平均
     '''
     assert mlen>0,u'mlen should > 0'
-    if not hasattr(_ts,'ma'):
+    if not _ts.initialized:
+        _ts.initialized = True
         _ts.sa = [0]*mlen   #哨兵
         _ts.ma = []
 
@@ -280,7 +292,8 @@ def NMA(source,_ts=None):
         使用方式:
         rev = MA(source) #返回source的当期及之前的平均值
     '''
-    if not hasattr(_ts,'nma'):
+    if not _ts.initialized:
+        _ts.initialized = True
         _ts.sa = [0]   #哨兵
         _ts.nma = []
 
@@ -300,8 +313,9 @@ def CEXPMA(source,mlen,_ts=None):
     if len(source) == 0:#不计算空序列，直接返回
         return []
 
-    if not hasattr(_ts,'ema'):
-        print 'new cexpma ema'
+    if not _ts.initialized:
+        _ts.initialized = True
+        #print 'new cexpma ema'
         _ts.ema = [source[0]]   #哨兵元素是source[0]，确保计算得到的值在<mlen元素的情况下也正确
 
     cur = _ts.ema[-1]
@@ -317,7 +331,8 @@ def TR(sclose,shigh,slow,_ts=None):
     if len(sclose) == 0:
         return []
 
-    if not hasattr(_ts,'tr'):
+    if not _ts.initialized:
+        _ts.initialized = True
         _ts.tr = [(shigh[0]-slow[0]) * XBASE]
 
     for i in range(len(_ts.tr),len(sclose)):
@@ -356,7 +371,8 @@ def STREND(source,_ts=None):
     if len(source) == 0:
         return []
 
-    if not hasattr(_ts,'sd'):
+    if not _ts.initialized:
+        _ts.initialized = True
         _ts.sd = [0]    #第一个是无趋势
 
     slen = len(_ts.sd)
@@ -389,8 +405,9 @@ def TMM(source,covered,vmm,fcmp,fgroup,_ts=None):
     if len(source) == 0:
         return []
 
-    if not hasattr(_ts,'tmm'):
-        print 'new tmm'
+    if not _ts.initialized:
+        _ts.initialized = True
+        #print 'new tmm'
         _ts.tmm = []    #第一个是无趋势
         _ts.buffer = None
 
@@ -434,7 +451,8 @@ def CROSS(source1,source2,rcmp,_ts=None):
     if len(source1) == 0:
         return []
 
-    if not hasattr(_ts,'crs'):
+    if not _ts.initialized:
+        _ts.initialized = True
         _ts.crs = [1 if rcmp(source2[0],source1[0]) else 0]   #第一个取决于状态，如果为已×，则为1
 
     ps = _ts.crs[-1]
@@ -448,5 +466,24 @@ UPCROSS = fcustom(CROSS,rcmp = operator.gt) #追击-平-平-超越，以及超�
 DOWNCROSS = fcustom(CROSS,rcmp = operator.lt) #追击-平-平-超越，以及超越-平-超越均算×
 
 @indicator
-def x(s1,s2,_ts=None,*args):
-    pass
+def REF(source,offset=1,_ts=None):
+    '''
+        取得偏移为offset的序列
+        前offset部分用第一元素填充
+        如果仅用于比较,不建议用这个函数,而直接用[-1]下标比较
+        只有在偏移CROSS时才有意义
+    '''
+    if len(source) == 0:
+        return []
+
+    if not _ts.initialized:
+        _ts.initialized = True
+        _ts.ref = [source[0]]
+    
+    for i in range(len(_ts.ref),offset if offset <= len(source) else len(source)):
+        _ts.ref.append(source[0])
+
+    for i in range(len(_ts.ref),len(source)):
+        _ts.ref.append(source[i-offset])
+
+    return _ts.ref
