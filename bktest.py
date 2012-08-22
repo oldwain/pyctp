@@ -83,7 +83,8 @@ class TickAgent(object):#ticks数据管理,只管理一个合约,并最多测试
         dorder = 1
         pre_tick = None
         vhigh = vlow = 0
-        
+        env.iorder = 0  #日间不连续
+
         for ctick in dticks.ticks:
             #print ctick.time
             ctick.iorder = env.iorder
