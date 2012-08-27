@@ -290,7 +290,9 @@ class T_LONG(strategy.BREAK):
         self.valid_length = valid_length
 
     def calc_target_price(self,base_price,tick_base):
-        return base_price + tick_base * self.bid_ticks
+        tprice = base_price + tick_base * self.bid_ticks
+        print 'target price:',tprice
+        return tprice
 
     def get_valid_length(self):
         return self.valid_length
@@ -322,7 +324,7 @@ class T_LONG_EC(T_LONG):
         EMA通道
     '''
     def __init__(self,bid_ticks=3,valid_length=10,rlen=10):
-        T_LONG.__init__(self,bid_ticks,valid_length)
+        T_LONG.__init__(self,bid_ticks=bid_ticks,valid_length=valid_length)
         self.base_line = 99999999
         self.rlen = rlen
         self.ema = None
@@ -357,7 +359,7 @@ class T_LONG_EC(T_LONG):
 #  止损示例
 ###########
 class T_LONG_MOVING_STOPER(strategy.LONG_STOPER):
-    def __init__(self,data,bline,max_overflow=strategy.MAX_CLOSE_OVERFLOW,valid_length=strategy.STOP_VALID_LENGTH,opened=None,tick_base=2,base_lost=10):
+    def __init__(self,data,bline,max_overflow=strategy.MAX_CLOSE_OVERFLOW,valid_length=strategy.STOP_VALID_LENGTH,opened=None,tick_base=2,base_lost=10,mtime=2):
         strategy.LONG_STOPER.__init__(self,data,bline)
         self.max_overflow = max_overflow    #溢点用于计算目标价
         self.valid_length = valid_length    #有效期用于计算撤单时间
@@ -368,6 +370,7 @@ class T_LONG_MOVING_STOPER(strategy.LONG_STOPER):
         self.set_base_line(self.base_stop)
         self.thigh = opened.base_price
         self.tick_base = tick_base
+        self.mtime = mtime  #移动的单位,每前进mtime,则将止损移动1/mtime
         #print opened.tick.time,opened.base_price,self.base_stop
 
 
@@ -379,8 +382,8 @@ class T_LONG_MOVING_STOPER(strategy.LONG_STOPER):
 
         bl2 = tick.price - 1000
 
-        if tick.price >= self.thigh + self.tick_base * 2:
-            bl1 = self.get_base_line() + (tick.price - self.thigh)/2
+        if tick.price >= self.thigh + self.tick_base * self.mtime:
+            bl1 = self.get_base_line() + (tick.price - self.thigh)/self.mtime
             bl2 = tick.price - 15
             #self.set_base_line(bl1 if bl1 > bl2 else bl2)
             self.set_base_line(bl1)
@@ -391,7 +394,7 @@ class T_LONG_MOVING_STOPER(strategy.LONG_STOPER):
 
 
 class T_SHORT_MOVING_STOPER(strategy.SHORT_STOPER):
-    def __init__(self,data,bline,max_overflow=strategy.MAX_CLOSE_OVERFLOW,valid_length=strategy.STOP_VALID_LENGTH,opened=None,tick_base=2,base_lost=10):
+    def __init__(self,data,bline,max_overflow=strategy.MAX_CLOSE_OVERFLOW,valid_length=strategy.STOP_VALID_LENGTH,opened=None,tick_base=2,base_lost=10,mtime=2):
         strategy.SHORT_STOPER.__init__(self,data,bline)
         self.max_overflow = max_overflow    #溢点用于计算目标价
         self.valid_length = valid_length    #有效期用于计算撤单时间
@@ -402,6 +405,7 @@ class T_SHORT_MOVING_STOPER(strategy.SHORT_STOPER):
         self.set_base_line(self.base_stop)
         self.tlow = opened.base_price
         self.tick_base = tick_base
+        self.mtime = mtime  #移动的单位,每前进mtime,则将止损移动1/mtime
 
     def check(self,tick):
         if tick.price > self.get_base_line() or tick.min1>1500:
@@ -414,8 +418,8 @@ class T_SHORT_MOVING_STOPER(strategy.SHORT_STOPER):
         #    self.set_base_line(self.get_base_line() if self.get_base_line()<self.opened.price else self.opened.price)
         #    #self.set_base_line(self.opened.price)
         #    stop_changed = True
-        if tick.price <= self.tlow - self.tick_base * 2:
-            self.set_base_line(self.get_base_line() + (self.tlow - tick.price)/2)
+        if tick.price <= self.tlow - self.tick_base * self.mtime:
+            self.set_base_line(self.get_base_line() + (self.tlow - tick.price)/self.mtime)
             self.tlow = tick.price 
             stop_changed = True
         return (False,0,stop_changed)
