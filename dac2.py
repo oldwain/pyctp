@@ -15,6 +15,7 @@ from base import (
         fcustom,
         indicator,
         icache,
+        t2order_if,
     )
 
 from dac import (
@@ -296,6 +297,7 @@ def NMA(source,_ts=None):
         _ts.initialized = True
         _ts.sa = [0]   #哨兵
         _ts.nma = []
+        #print 'initial NMA'
 
     slen = len(_ts.nma)
     ss = _ts.sa[-1]
@@ -479,6 +481,7 @@ def REF(source,offset=1,_ts=None):
     if not _ts.initialized:
         _ts.initialized = True
         _ts.ref = [source[0]]
+        #print 'initialize REF'
     
     for i in range(len(_ts.ref),offset if offset <= len(source) else len(source)):
         _ts.ref.append(source[0])
@@ -487,3 +490,59 @@ def REF(source,offset=1,_ts=None):
         _ts.ref.append(source[i-offset])
 
     return _ts.ref
+
+NullMinute = BaseObject(sopen=[],sclose=[],shigh=[],slow=[],svol=[],iorder=[])
+
+@indicator
+def MINUTE(ticks,t2order=t2order_if,_ts=None):
+    '''
+        分钟切分
+        这个实现的最大问题是未处理最后一分钟的收尾
+        但这种场景仅用于保存数据, 可以在使用MINUTE之后, 由特别的语句去判断最后一个tick,并收尾最后一分钟
+    '''
+
+    if len(ticks) == 0:
+        return NullMinute
+
+    if not _ts.initialized:
+        _ts.initialized = True
+        _ts.sopen = []
+        _ts.sclose = []
+        _ts.shigh = []
+        _ts.slow = []
+        _ts.svol = []
+        _ts.iorder = []
+        _ts.min1 = []
+        _ts.cur = BaseObject(vopen = ticks[0].price,vclose = ticks[0].price,vhigh=ticks[0].price,vlow=ticks[0].price,open_dvol=0,close_dvol=ticks[0].dvolume,min1=ticks[0].min1,iorder=t2order[ticks[0].min1])  #这里对dvol的处理,使得中断恢复也必须从当日最开始开始,否则所有前述成交量被归结到第一tick
+        _ts.ilast = 0
+
+    scur = _ts.cur
+    for i in range(_ts.ilast,len(ticks)):
+        tcur = ticks[i]
+        if tcur.min1 != scur.min1:  #切换
+            _ts.sopen.append(scur.vopen)
+            _ts.sclose.append(scur.vclose)
+            _ts.shigh.append(scur.vhigh)
+            _ts.slow.append(scur.vlow)
+            _ts.svol.append(scur.close_dvol - scur.open_dvol)
+            _ts.min1.append(scur.min1)
+            scur.vopen = scur.vclose = scur.vhigh = scur.vlow = tcur.price
+            scur.open_dvol = scur.close_dvol
+            scur.close_dvol = tcur.dvolume
+            scur.dvol = tcur.dvolume
+            scur.min1 = tcur.min1
+            scur.iorder = t2order[tcur.min1]
+        else:   #未切换
+            scur.vclose = tcur.price
+            scur.close_dvol = tcur.dvolume
+            #print scur.min1,'close:',scur.vclose
+            if tcur.price > scur.vhigh:
+                scur.vhigh = tcur.price
+            elif tcur.price < scur.vlow:
+                scur.vlow = tcur.price
+
+    _ts.ilast = len(ticks)
+    return _ts
+
+    
+

@@ -223,6 +223,33 @@ class ModuleTest(unittest.TestCase):
         self.assertEquals([1,1,1,2,3,4,5,6,7,8,9],REF(a,2))
 
 
+    def test_minute(self):
+        m1 = MINUTE([])
+        self.assertEquals([],m1.sclose)
+        tick1 = BaseObject(price=100,min1=914,dvolume=10)
+        tick2 = BaseObject(price=110,min1=915,dvolume=30)
+        tick3 = BaseObject(price=115,min1=915,dvolume=50)
+        tick4 = BaseObject(price=91,min1=916,dvolume=51)
+        ticks = [tick1,tick2,tick3,tick4]
+        m2 = MINUTE(ticks)
+        self.assertEquals([100,115],m2.sclose)
+        self.assertEquals([100,110],m2.slow)
+        self.assertEquals([100,115],m2.shigh)
+        self.assertEquals([914,915],m2.min1)
+        self.assertEquals([10,40],m2.svol)
+        tick5 = BaseObject(price=93,min1=916,dvolume=80)
+        tick6 = BaseObject(price=90,min1=916,dvolume=88)
+        tick7 = BaseObject(price=90,min1=917,dvolume=89)
+        ticks.extend([tick5,tick6,tick7])
+        m2 = MINUTE(ticks)
+        self.assertEquals([100,115,90],m2.sclose)
+        self.assertEquals([100,110,90],m2.slow)
+        self.assertEquals([100,115,93],m2.shigh)
+        self.assertEquals([914,915,916],m2.min1)
+        self.assertEquals([10,40,38],m2.svol)
+
+
+
 
 if __name__ == "__main__":
     import logging
