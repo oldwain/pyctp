@@ -265,6 +265,41 @@ class Trade(object):
             stimes += 1
         #return 'times=%s,profit=%s' %(stimes,sprofit)
         return (stimes,sprofit)
+    
+    @staticmethod
+    def max_drawdown(ftrades,datefrom=20100401,dateto=20200101):
+        '''
+            在中间即便有盈利，但是如果累计起来仍然为负，则持续计算
+        '''
+        smax = 0    #最大连续回撤
+        max1 = 0    #最大单笔回撤
+        curs = 0
+        pre_curs = 0
+        mdate = 20100401
+        spoint=0
+        sdate = 20100401
+        ssdate = sdate
+        sspoint = spoint
+        for func,trades in ftrades:
+            for trade in trades:
+                tdate = trade.open_tick.date
+                if tdate > datefrom and tdate < dateto: #忽略掉小于开始时间的
+                    curs += trade.get_profit()   #本为负数
+                    if curs < 0 and pre_curs >= 0:
+                        spoint = trade.open_tick.price
+                        sdate = trade.open_tick.date
+                    if curs > 0:
+                        curs = 0
+                    elif curs < smax:
+                        smax = curs
+                        mdate = trade.open_tick.date
+                        ssdate = sdate
+                        sspoint = spoint
+                    pre_curs = curs
+                    if trade.get_profit() < max1:
+                        max1 = trade.get_profit()
+            print func.name,(smax,max1,ssdate,mdate,sspoint)
+        return
 
 
 class DTicks(object):#日tick结构
