@@ -38,4 +38,4 @@
 
    import ctp_mock
 
-   ctp_mock.real_mock()
+   ctp_mock.comp_real()
