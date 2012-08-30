@@ -193,6 +193,23 @@ class ModuleTest(unittest.TestCase):
         self.assertEquals([10,10,3,2,2,5,0,0,13,9,3,3],TMIN(source,2))
         self.assertEquals([10,10,3,2,2,2,0,0,0,9,3,3],TMIN(source,3))
 
+    def test_nmax(self):
+        self.assertEquals([],NMAX([]))
+        source = [10,12,3,2,5,100,0,13,16,9]
+        self.assertEquals([10,12,12,12,12,100,100,100,100,100],NMAX(source))
+        source.append(3)
+        source.append(103)
+        self.assertEquals([10,12,12,12,12,100,100,100,100,100,100,103],NMAX(source))
+
+    def test_nmin(self):
+        self.assertEquals([],NMIN([]))
+        source = [10,12,3,2,5,100,0,13,16,9]
+        self.assertEquals([10,10,3,2,2,2,0,0,0,0],NMIN(source))
+        source.append(3)
+        source.append(-1)
+        self.assertEquals([10,10,3,2,2,2,0,0,0,0,0,-1],NMIN(source))
+
+
     def test_cross(self):   #
         self.assertEquals([],UPCROSS([],[]))
         target = [10,20,30,40,50,40,30,20,10,12,11,12]
