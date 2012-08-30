@@ -444,6 +444,31 @@ TMAX = fcustom(TMM,vmm=-99999999,fcmp=operator.gt,fgroup=max)
 TMIN = fcustom(TMM,vmm=99999999,fcmp=operator.lt,fgroup=min)
 
 @indicator
+def NMM(source,vmm,fcmp,_ts=None):
+    '''
+        从index0算起的极值.
+        相当于covered取最大值时的TMM
+    '''
+    if len(source) == 0:
+        return []
+
+    if not _ts.initialized:
+        _ts.initialized = True
+        #print 'new nmm'
+        _ts.nmm = []    #第一个是无趋势
+
+    slen = len(source)
+    cmm = _ts.nmm[-1] if _ts.nmm else vmm
+    for i in range(len(_ts.nmm),len(source)):
+        if fcmp(source[i],cmm):
+            cmm = source[i]
+        _ts.nmm.append(cmm)
+    return _ts.nmm
+NMAX = fcustom(NMM,vmm=-99999999,fcmp=operator.gt)
+NMIN = fcustom(NMM,vmm=99999999,fcmp=operator.lt)
+
+
+@indicator
 def CROSS(source1,source2,rcmp,_ts=None):
     '''
         source2去交叉source1
