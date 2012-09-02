@@ -548,6 +548,7 @@ def MINUTE(ticks,t2order=t2order_if,_ts=None):
                              iorder=t2order[ticks[0].min1]
                         )  #这里对dvol的处理,使得中断恢复也必须从当日最开始开始,否则所有前述成交量被归结到第一tick
         _ts.ilast = 0
+        _ts.modified = False    #上周期完成标志
 
     scur = _ts.cur
     for i in range(_ts.ilast,len(ticks)):
@@ -566,6 +567,7 @@ def MINUTE(ticks,t2order=t2order_if,_ts=None):
             scur.dvol = tcur.dvolume
             scur.min1 = tcur.min1
             scur.iorder = t2order[tcur.min1]
+            _ts.modified = True
         else:   #未切换
             scur.vclose = tcur.price
             scur.close_dvol = tcur.dvolume
@@ -574,6 +576,7 @@ def MINUTE(ticks,t2order=t2order_if,_ts=None):
                 scur.vhigh = tcur.price
             elif tcur.price < scur.vlow:
                 scur.vlow = tcur.price
+            _ts.modified = False
 
     _ts.ilast = len(ticks)
     return _ts
@@ -617,6 +620,7 @@ def XMINUTE(m1,sfunc,_ts=None):
                              iorder=0,
                     )  
         _ts.ilast = 0
+        _ts.modified = False    #上周期完成标志
 
     scur = _ts.cur
     for i in range(_ts.ilast,len(m1.sclose)):
@@ -630,7 +634,7 @@ def XMINUTE(m1,sfunc,_ts=None):
             scur.vhigh = m1.shigh[i]
         if m1.slow[i] < scur.vlow:
             scur.vlow = m1.slow[i]
-
+        _ts.modified = False
         if sfunc(morder):  #切换
             _ts.sopen.append(scur.vopen)
             _ts.sclose.append(scur.vclose)
@@ -647,6 +651,7 @@ def XMINUTE(m1,sfunc,_ts=None):
             scur.svol = 0
             scur.xmin = 0
             scur.iorder += 1
+            _ts.modified = True
 
     _ts.ilast = len(m1.sclose)
     return _ts
