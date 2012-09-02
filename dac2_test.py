@@ -265,7 +265,41 @@ class ModuleTest(unittest.TestCase):
         self.assertEquals([914,915,916],m2.min1)
         self.assertEquals([10,40,38],m2.svol)
 
-
+    def test_xminute(self):
+        m1 = MINUTE3(BaseObject(sclose=[]))
+        self.assertEquals([],m1.sclose)
+        m1s = BaseObject(sopen=[10,20,30,40,50,60,70,80],
+                         sclose=[12,22,32,42,52,62,72,82],
+                         shigh = [15,25,35,45,55,65,75,85],
+                         slow=[8,18,28,38,48,58,68,78],
+                         svol=[1,2,3,4,5,6,7,8],
+                         iorder = [0,1,2,3,4,5,6,7],
+                         min1 = [914,915,916,917,918,919,920,921]
+                        )
+        m2 = MINUTE3(m1s)
+        self.assertEquals([10,50],m2.sopen)
+        self.assertEquals([42,72],m2.sclose)
+        self.assertEquals([8,48],m2.slow)
+        self.assertEquals([45,75],m2.shigh)
+        self.assertEquals([914,918],m2.xmin)
+        self.assertEquals([10,18],m2.svol)
+        self.assertEquals([0,1],m2.iorder)
+        ########
+        m1s.sopen.extend([90,100])
+        m1s.sclose.extend([92,102])
+        m1s.shigh.extend([95,105])
+        m1s.slow.extend([88,99])
+        m1s.svol.extend([100,101])
+        m1s.iorder.extend([8,9])
+        m1s.min1.extend([922,923])
+        m2 = MINUTE3(m1s)
+        self.assertEquals([10,50,80],m2.sopen)
+        self.assertEquals([42,72,102],m2.sclose)
+        self.assertEquals([8,48,78],m2.slow)
+        self.assertEquals([45,75,105],m2.shigh)
+        self.assertEquals([914,918,921],m2.xmin)
+        self.assertEquals([10,18,209],m2.svol)
+        self.assertEquals([0,1,2],m2.iorder)
 
 
 if __name__ == "__main__":
