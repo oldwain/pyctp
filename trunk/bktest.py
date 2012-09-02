@@ -67,7 +67,8 @@ class TickAgent(object):#ticks数据管理,只管理一个合约,并最多测试
         for ss in mystrategys:  #日初始化
             ss.opener.dreset()
         logging.info('run day:%s' % (dticks.tdate))
-        env.cur_inst = BaseObject(cur_day=BaseObject(vhigh=0,vlow=99999999),
+        popen = dticks.ticks[0].price
+        env.cur_inst = BaseObject(cur_day=BaseObject(vhigh=popen,vlow=popen,vopen=popen),
                                                      ticks=[],
                                                      prices=[],
                                                      dvols=[],
@@ -82,7 +83,6 @@ class TickAgent(object):#ticks数据管理,只管理一个合约,并最多测试
         dvol = 0
         dorder = 1
         pre_tick = None
-        vhigh = vlow = 0
         env.iorder = 0  #日间不连续
 
         for ctick in dticks.ticks:

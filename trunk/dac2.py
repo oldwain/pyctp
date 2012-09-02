@@ -538,7 +538,15 @@ def MINUTE(ticks,t2order=t2order_if,_ts=None):
         _ts.svol = []
         _ts.iorder = []
         _ts.min1 = []
-        _ts.cur = BaseObject(vopen = ticks[0].price,vclose = ticks[0].price,vhigh=ticks[0].price,vlow=ticks[0].price,open_dvol=0,close_dvol=ticks[0].dvolume,min1=ticks[0].min1,iorder=t2order[ticks[0].min1])  #这里对dvol的处理,使得中断恢复也必须从当日最开始开始,否则所有前述成交量被归结到第一tick
+        _ts.cur = BaseObject(vopen = ticks[0].price,
+                             vclose = ticks[0].price,
+                             vhigh=ticks[0].price,
+                             vlow=ticks[0].price,
+                             open_dvol=0,
+                             close_dvol=ticks[0].dvolume,
+                             min1=ticks[0].min1,
+                             iorder=t2order[ticks[0].min1]
+                        )  #这里对dvol的处理,使得中断恢复也必须从当日最开始开始,否则所有前述成交量被归结到第一tick
         _ts.ilast = 0
 
     scur = _ts.cur
@@ -551,6 +559,7 @@ def MINUTE(ticks,t2order=t2order_if,_ts=None):
             _ts.slow.append(scur.vlow)
             _ts.svol.append(scur.close_dvol - scur.open_dvol)
             _ts.min1.append(scur.min1)
+            _ts.iorder.append(scur.iorder)
             scur.vopen = scur.vclose = scur.vhigh = scur.vlow = tcur.price
             scur.open_dvol = scur.close_dvol
             scur.close_dvol = tcur.dvolume
@@ -569,5 +578,83 @@ def MINUTE(ticks,t2order=t2order_if,_ts=None):
     _ts.ilast = len(ticks)
     return _ts
 
-    
+
+##以下为确认周期结束的iorder函数
+XS3 = lambda x:x%3==0 and x>0   ##914归入下一周期
+XS5 = lambda x: x%5==0 and x>0      
+XS10 = lambda x: x%10== 0 and x>0
+XS15 = lambda x:x%15 == 0 and x>0
+XS30 = lambda x:x%30 == 0 and x>0
+XSDAY = lambda x:x == 270
+
+NullXMinute = BaseObject(sopen=[],sclose=[],shigh=[],slow=[],svol=[],iorder=[])
+
+@indicator
+def XMINUTE(m1,sfunc,_ts=None):
+    '''
+        1分钟以上周期
+        sfunc为确认周期结束的点
+    '''
+
+    if len(m1.sclose) == 0:
+        return NullXMinute
+
+    if not _ts.initialized:
+        _ts.initialized = True
+        _ts.sopen = []
+        _ts.sclose = []
+        _ts.shigh = []
+        _ts.slow = []
+        _ts.svol = []
+        _ts.iorder = []
+        _ts.xmin = []       #开盘分钟
+        _ts.cur = BaseObject(vopen = 0,
+                             vclose = 0,
+                             vhigh=0,
+                             vlow=99999999,
+                             xmin =0,                             
+                             svol=0,
+                             iorder=0,
+                    )  
+        _ts.ilast = 0
+
+    scur = _ts.cur
+    for i in range(_ts.ilast,len(m1.sclose)):
+        morder = m1.iorder[i]
+        if scur.vopen == 0:
+            scur.vopen = m1.sopen[i]
+            scur.xmin = m1.min1[i]
+        scur.vclose = m1.sclose[i]
+        scur.svol += m1.svol[i]
+        if m1.shigh[i] > scur.vhigh:
+            scur.vhigh = m1.shigh[i]
+        if m1.slow[i] < scur.vlow:
+            scur.vlow = m1.slow[i]
+
+        if sfunc(morder):  #切换
+            _ts.sopen.append(scur.vopen)
+            _ts.sclose.append(scur.vclose)
+            _ts.shigh.append(scur.vhigh)
+            _ts.slow.append(scur.vlow)
+            _ts.svol.append(scur.svol)
+            _ts.iorder.append(scur.iorder)
+            _ts.xmin.append(scur.xmin)
+
+            scur.vopen = 0
+            scur.vclose = 0
+            scur.vhigh = 0
+            scur.vlow = 99999999
+            scur.svol = 0
+            scur.xmin = 0
+            scur.iorder += 1
+
+    _ts.ilast = len(m1.sclose)
+    return _ts
+
+MINUTE3 = fcustom(XMINUTE,sfunc=XS3)   
+MINUTE5 = fcustom(XMINUTE,sfunc=XS5)   
+MINUTE10 = fcustom(XMINUTE,sfunc=XS10)   
+MINUTE15 = fcustom(XMINUTE,sfunc=XS15)   
+MINUTE30 = fcustom(XMINUTE,sfunc=XS30)   
+MINUTED = fcustom(XMINUTE,sfunc=XSDAY)   
 
