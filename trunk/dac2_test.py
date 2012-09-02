@@ -254,6 +254,7 @@ class ModuleTest(unittest.TestCase):
         self.assertEquals([100,115],m2.shigh)
         self.assertEquals([914,915],m2.min1)
         self.assertEquals([10,40],m2.svol)
+        self.assertTrue(m2.modified)
         tick5 = BaseObject(price=93,min1=916,dvolume=80)
         tick6 = BaseObject(price=90,min1=916,dvolume=88)
         tick7 = BaseObject(price=90,min1=917,dvolume=89)
@@ -264,6 +265,12 @@ class ModuleTest(unittest.TestCase):
         self.assertEquals([100,115,93],m2.shigh)
         self.assertEquals([914,915,916],m2.min1)
         self.assertEquals([10,40,38],m2.svol)
+        self.assertTrue(m2.modified)
+        tick8 = BaseObject(price=91,min1=917,dvolume=81)
+        ticks.append(tick8)
+        m2 = MINUTE(ticks)
+        self.assertFalse(m2.modified)
+
 
     def test_xminute(self):
         m1 = MINUTE3(BaseObject(sclose=[]))
@@ -284,6 +291,7 @@ class ModuleTest(unittest.TestCase):
         self.assertEquals([914,918],m2.xmin)
         self.assertEquals([10,18],m2.svol)
         self.assertEquals([0,1],m2.iorder)
+        self.assertFalse(m2.modified)
         ########
         m1s.sopen.extend([90,100])
         m1s.sclose.extend([92,102])
@@ -300,6 +308,7 @@ class ModuleTest(unittest.TestCase):
         self.assertEquals([914,918,921],m2.xmin)
         self.assertEquals([10,18,209],m2.svol)
         self.assertEquals([0,1,2],m2.iorder)
+        self.assertTrue(m2.modified)
 
 
 if __name__ == "__main__":
