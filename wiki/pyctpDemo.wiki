@@ -2,6 +2,8 @@
 #labels pyctp,demo
 
 首先请确保pyctp安装成功
+程序运行目录须为pyctp主目录，并
+import my.entry
 
 = 1.行情记录 =
 程序入口: my.entry.save_demo()
