@@ -329,6 +329,20 @@ def CEXPMA(source,mlen,_ts=None):
 EMA = CEXPMA
 
 @indicator
+def MACD(source,ifast=12,islow=26,idiff=9,_ts=None):
+    if not _ts.initialized:
+        _ts.initialized = True
+        _ts.diff = []
+        _ts.dea = []
+
+    src = MUL1(source,FBASE)
+    sfast = EMA(src,ifast)
+    sslow = EMA(src,islow)
+    _ts.diff = SUB(sfast,sslow)
+    _ts.dea = EMA(_ts.diff,idiff)
+    return _ts
+
+@indicator
 def TR(sclose,shigh,slow,_ts=None):
     if len(sclose) == 0:
         return []
@@ -491,6 +505,31 @@ def CROSS(source1,source2,rcmp,_ts=None):
 
 UPCROSS = fcustom(CROSS,rcmp = operator.gt) #追击-平-平-超越，以及超越-平-超越均算×
 DOWNCROSS = fcustom(CROSS,rcmp = operator.lt) #追击-平-平-超越，以及超越-平-超越均算×
+
+@indicator
+def NCROSS(source,target,rcmp,_ts=None):
+    '''
+        source去交叉target, target为数字
+        rcmp为判断已交叉状态的函数
+        返回值中,0为未×,1为×
+    '''
+    if len(source) == 0:
+        return []
+
+    if not _ts.initialized:
+        _ts.initialized = True
+        _ts.crs = [1 if rcmp(source[0],target) else 0]   #第一个取决于状态，如果为已×，则为1
+
+    ps = _ts.crs[-1]
+    for i in range(len(_ts.crs),len(source)):
+        cs = rcmp(source[i],target)
+        _ts.crs.append(1 if not ps and cs else 0)
+        ps = cs
+    return _ts.crs
+
+NUPCROSS = fcustom(NCROSS,rcmp = operator.gt) #追击-平-平-超越，以及超越-平-超越均算×
+NDOWNCROSS = fcustom(NCROSS,rcmp = operator.lt) #追击-平-平-超越，以及超越-平-超越均算×
+
 
 @indicator
 def REF(source,offset=1,_ts=None):

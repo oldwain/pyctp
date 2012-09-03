@@ -225,6 +225,19 @@ class ModuleTest(unittest.TestCase):
         self.assertEquals([0,0,1,0,0,0,0,1,0,0,1,0,0,1],UPCROSS(target,follow))
         self.assertEquals([1,0,0,0,0,0,1,0,1,0,0,0,1,0],DOWNCROSS(target,follow))
 
+    def test_ncross(self):   #
+        self.assertEquals([],NUPCROSS([],10))
+        follow = [5,15,35,41,60,50,25,26,8,12,13,12]
+        self.assertEquals([0,1,0,0,0,0,0,0,0,1,0,0],NUPCROSS(follow,10))
+        self.assertEquals([1,0,0,0,0,0,0,0,1,0,0,0],NDOWNCROSS(follow,10))
+        follow.append(8)
+        self.assertEquals([0,1,0,0,0,0,0,0,0,1,0,0,0],NUPCROSS(follow,10))
+        self.assertEquals([1,0,0,0,0,0,0,0,1,0,0,0,1],NDOWNCROSS(follow,10))
+        follow.append(25)
+        self.assertEquals([0,0,1,0,0,0,0,0,0,0,0,0,0,1],NUPCROSS(follow,15))
+        self.assertEquals([1,0,0,0,0,0,0,0,1,0,0,0,1,0],NDOWNCROSS(follow,10))
+
+
     def test_ref(self):
         self.assertEquals([],REF([]))
         a= [1,2,3,4,5,6,7,8,9,0]
