@@ -137,8 +137,9 @@ def calc_t2order(begin,end,(mid1,mid2)=(1130,1300)):
             continue
         it = i/100 * 60 + i%100
         t2order[i] = it - nbegin
-
-    t2order[mid1] = it - nbegin
+    
+    it = mid1/100 * 60 + mid1%100
+    t2order[mid1] = it - nbegin - 1     #中间截止时间是不存在的,比如11:30
 
     for i in range(mid2,end):
         it = i/100 * 60 + i%100
@@ -146,14 +147,15 @@ def calc_t2order(begin,end,(mid1,mid2)=(1130,1300)):
             continue
         t2order[i] = it - nbegin - 90
 
-    t2order[end] = it - nbegin - 90
+    it = end/100 * 60 + end%100
+    t2order[end] = it - nbegin - 90 - 1 #最后时间是不存在,比如15:15/15:00
     return t2order
 
 #IF: time-->order
 t2order_if = calc_t2order(914,1515)
 
 #商品: time-->order. 中间有休息
-t2order_com = calc_t2order(859,1500)
+t2order_com = calc_t2order(859,1500,(1130,1330))    #未刻意去处理1015-1029时间段
 
 #模拟
 t2order_mock = calc_t2order(1900,2330,(2115,2115))

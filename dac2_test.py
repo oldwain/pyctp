@@ -117,6 +117,12 @@ class ModuleTest(unittest.TestCase):
         a.append(100)
         self.assertEquals([1,2,2,3,3,4,4,5,5,5,13],NMA(a))
 
+    def test_nsum(self):
+        self.assertEquals([],NSUM([]))
+        a= [1,2,3,4,5,6,7,8,9,0]
+        self.assertEquals([1,3,6,10,15,21,28,36,45,45],NSUM(a))
+        a.append(100)
+        self.assertEquals([1,3,6,10,15,21,28,36,45,45,145],NSUM(a))
 
     def test_cexpma(self):
         self.assertEquals([],CEXPMA([],6))
