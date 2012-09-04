@@ -660,8 +660,8 @@ class c_instrument(object):
         #其中tdata.m1/m3/m5/m15/m30/d1为不同周期的数据
         #   tdata.cur_min是当前分钟的行情，包括开盘,最高,最低,当前价格,持仓,累计成交量
         #   tdata.cur_day是当日的行情，包括开盘,最高,最低,当前价格,持仓,累计成交量, 其中最高/最低有两类，一者是tick的当前价集合得到的，一者是tick中的最高/最低价得到的
-        #self.t2order = t2order_if if hreader.is_if(self.name) else t2order_com
-        self.t2order = t2order
+        self.t2order = t2order_if if hreader.is_if(self.name) else t2order_com
+        #self.t2order = t2order
         ##模拟的在外面解决
         #if int(time.strftime('%H%M%S')) > 170000:   #模拟
         #    self.t2order = t2order_mock
