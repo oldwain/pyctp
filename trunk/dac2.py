@@ -310,6 +310,25 @@ def NMA(source,_ts=None):
     return _ts.nma
 
 @indicator
+def NSUM(source,_ts=None):
+    '''
+        总累加
+        使用方式:
+        rev = MA(source) #返回source的当期及之前的平均值
+    '''
+    if not _ts.initialized:
+        _ts.initialized = True
+        _ts.sa = []   #哨兵
+
+    slen = len(_ts.sa)
+    ss = _ts.sa[-1] if _ts.sa else 0
+    for i in range(slen,len(source)):
+        ss += source[i]
+        _ts.sa.append(ss)
+    return _ts.sa
+
+
+@indicator
 def CEXPMA(source,mlen,_ts=None):
     assert mlen>0,u'mlen should > 0'
     if len(source) == 0:#不计算空序列，直接返回
