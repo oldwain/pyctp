@@ -43,7 +43,7 @@ class TickAgent(object):#ticks数据管理,只管理一个合约,并最多测试
             mystrategys = [mystrategys]
         self.trades = []
         #env = BaseObject(holdings=False,to_open=[],to_close=[],cur_inst=None,iorder=0) #holding是当前持仓，to_open/close是当前信号
-        env = BaseObject(cur_inst=None,iorder=0) #holding是当前持仓，to_open/close是当前信号
+        env = BaseObject(cur_inst=None,iorder=0,days=BaseObject(sopen=[],sclose=[],shigh=[],slow=[])) #holding是当前持仓，to_open/close是当前信号
         for ss in mystrategys:  #初始化
             ss.holdings = False
             ss.to_open = []
@@ -55,6 +55,10 @@ class TickAgent(object):#ticks数据管理,只管理一个合约,并最多测试
                 continue
             ##主循环
             self.run_day(env,mystrategys,dt)
+            env.days.sopen.append(env.cur_inst.cur_day.vopen)
+            env.days.sclose.append(env.cur_inst.cur_day.vclose)
+            env.days.shigh.append(env.cur_inst.cur_day.vhigh)
+            env.days.slow.append(env.cur_inst.cur_day.vlow)
         #return self.trades#,env
         return mystrategys
 
@@ -68,18 +72,19 @@ class TickAgent(object):#ticks数据管理,只管理一个合约,并最多测试
             ss.opener.dreset()
         logging.info('run day:%s' % (dticks.tdate))
         popen = dticks.ticks[0].price
-        env.cur_inst = BaseObject(cur_day=BaseObject(vhigh=popen,vlow=popen,vopen=popen),
-                                                     ticks=[],
-                                                     prices=[],
-                                                     dvols=[],
-                                                     vols=[],
-                                                     bids=[],
-                                                     asks=[],
-                                                     vbid=[],
-                                                     vask=[],
-                                                     deltas=[],
-                                                     tick_base=2
-                                                    )
+        env.cur_inst = BaseObject(cur_day=BaseObject(vhigh=popen,vlow=popen,vopen=popen,vclose=popen),
+                                 days=env.days,   
+                                 ticks=[],
+                                 prices=[],
+                                 dvols=[],
+                                 vols=[],
+                                 bids=[],
+                                 asks=[],
+                                 vbid=[],
+                                 vask=[],
+                                 deltas=[],
+                                 tick_base=2,
+                              )
         dvol = 0
         dorder = 1
         pre_tick = None
@@ -112,6 +117,7 @@ class TickAgent(object):#ticks数据管理,只管理一个合约,并最多测试
             self.s_match_open(mystrategys,env,ctick)  #动作
             self.s_check_close(mystrategys,env,ctick)
             self.s_check_open(mystrategys,env,ctick)
+        env.cur_inst.vclose = dticks.ticks[-1].price
         print 'run tlen=%s' % (time.time()-tbegin,)
 
     def s_match_close(self,mystrategys,ctick):
