@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual C++ Express 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "_ctp_Md", "_ctp_Md\_ctp_Md.vcproj", "{9EB8ECE3-F6C6-4D11-A28C-6413F1211BD5}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "_ctp_Trader", "_ctp_Trader\_ctp_Trader.vcproj", "{CBF695BF-5F6A-4C97-8CB3-0CEFD6B71BED}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9EB8ECE3-F6C6-4D11-A28C-6413F1211BD5}.Debug|Win32.ActiveCfg = Debug|Win32
+		{9EB8ECE3-F6C6-4D11-A28C-6413F1211BD5}.Debug|Win32.Build.0 = Debug|Win32
+		{9EB8ECE3-F6C6-4D11-A28C-6413F1211BD5}.Release|Win32.ActiveCfg = Release|Win32
+		{9EB8ECE3-F6C6-4D11-A28C-6413F1211BD5}.Release|Win32.Build.0 = Release|Win32
+		{CBF695BF-5F6A-4C97-8CB3-0CEFD6B71BED}.Debug|Win32.ActiveCfg = Debug|Win32
+		{CBF695BF-5F6A-4C97-8CB3-0CEFD6B71BED}.Debug|Win32.Build.0 = Debug|Win32
+		{CBF695BF-5F6A-4C97-8CB3-0CEFD6B71BED}.Release|Win32.ActiveCfg = Release|Win32
+		{CBF695BF-5F6A-4C97-8CB3-0CEFD6B71BED}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
