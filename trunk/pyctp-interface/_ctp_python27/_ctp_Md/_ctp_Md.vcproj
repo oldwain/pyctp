@@ -61,6 +61,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
+				OutputFile="$(OutDir)\$(ProjectName).pyd"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="..\..\python27_dep\lib"
 				GenerateDebugInformation="true"
