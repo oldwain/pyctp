@@ -146,6 +146,7 @@ def calc_t2order(begin,end,(mid1,mid2)=(1130,1300)):
         if i%100 > 59:
             continue
         t2order[i] = it - nbegin - 90
+        #t2order[i] = t2order[i] = it - nbegin - ((mid2/100-mid1/100)*60 +(mid2%100 - mid1%100)) 
 
     it = end/100 * 60 + end%100
     t2order[end] = it - nbegin - 90 - 1 #最后时间是不存在,比如15:15/15:00
