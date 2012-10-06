@@ -559,14 +559,17 @@ def REF(source,offset=1,_ts=None):
 
     return _ts.ref
 
-NullMinute = BaseObject(sopen=[],sclose=[],shigh=[],slow=[],svol=[],iorder=[])
+NullMinute = BaseObject(sopen=[],sclose=[],shigh=[],slow=[],svol=[],iorder=[],sholding=[])
 
 @indicator
-def MINUTE(ticks,t2order=t2order_if,_ts=None):
+def MINUTE(ticks,pre_min1=None,t2order=t2order_if,_ts=None):
     '''
         分钟切分
         这个实现的最大问题是未处理最后一分钟的收尾
         但这种场景仅用于保存数据, 可以在使用MINUTE之后, 由特别的语句去判断最后一个tick,并收尾最后一分钟
+
+        pre_min1为默认时,只能用当日分钟
+        反之延续之前的分钟
     '''
 
     if len(ticks) == 0:
@@ -574,20 +577,32 @@ def MINUTE(ticks,t2order=t2order_if,_ts=None):
 
     if not _ts.initialized:
         _ts.initialized = True
-        _ts.sopen = []
-        _ts.sclose = []
-        _ts.shigh = []
-        _ts.slow = []
-        _ts.svol = []
-        _ts.iorder = []
-        _ts.min1 = []
-        _ts.cur = BaseObject(vopen = ticks[0].price,
-                             vclose = ticks[0].price,
-                             vhigh=ticks[0].price,
-                             vlow=ticks[0].price,
-                             open_dvol=0,
+        if pre_min1 == None:    #不接续
+            _ts.sopen = []
+            _ts.sclose = []
+            _ts.shigh = []
+            _ts.slow = []
+            _ts.svol = []
+            _ts.sholding=[]
+            _ts.iorder = []
+            _ts.min1 = []
+        else:
+            _ts.sopen = pre_min1.sopen
+            _ts.sclose = pre_min1.sclose
+            _ts.shigh = pre_min1.shigh
+            _ts.slow = pre_min1.slow
+            _ts.svol = pre_min1.svol
+            _ts.sholding=pre_min1.sholding
+            _ts.iorder = pre_min1.iorder
+            _ts.min1 = pre_min1.min1
+        _ts.cur = BaseObject(vopen = ticks[0].price,    
+                             vclose = ticks[0].price,   
+                             vhigh=ticks[0].price,      
+                             vlow=ticks[0].price,       
+                             open_dvol=ticks[0].dvolume,#存在初始误差
                              close_dvol=ticks[0].dvolume,
-                             min1=ticks[0].min1,
+                             holding = ticks[0].holding,
+                             min1=ticks[0].min1,    #当日第一min1
                              iorder=t2order[ticks[0].min1]
                         )  #这里对dvol的处理,使得中断恢复也必须从当日最开始开始,否则所有前述成交量被归结到第一tick
         _ts.ilast = 0
@@ -596,24 +611,28 @@ def MINUTE(ticks,t2order=t2order_if,_ts=None):
     scur = _ts.cur
     for i in range(_ts.ilast,len(ticks)):
         tcur = ticks[i]
-        if tcur.min1 != scur.min1:  #切换
+        #if tcur.min1 != scur.min1:  #切换
+        if tcur.min1 > scur.min1:  #切换, 避免ticks数据错误引发分钟序列紊乱,如20120905:958:59:500插入在20120905:959:00:00之后,虽然非常罕见,但会导致分钟序列出现958->959->958->959...这个情况
             _ts.sopen.append(scur.vopen)
             _ts.sclose.append(scur.vclose)
             _ts.shigh.append(scur.vhigh)
             _ts.slow.append(scur.vlow)
             _ts.svol.append(scur.close_dvol - scur.open_dvol)
+            _ts.sholding.append(scur.holding)
             _ts.min1.append(scur.min1)
             _ts.iorder.append(scur.iorder)
             scur.vopen = scur.vclose = scur.vhigh = scur.vlow = tcur.price
             scur.open_dvol = scur.close_dvol
             scur.close_dvol = tcur.dvolume
             scur.dvol = tcur.dvolume
+            scur.holding = tcur.holding
             scur.min1 = tcur.min1
             scur.iorder = t2order[tcur.min1]
             _ts.modified = True
         else:   #未切换
             scur.vclose = tcur.price
             scur.close_dvol = tcur.dvolume
+            scur.holding = tcur.holding
             #print scur.min1,'close:',scur.vclose
             if tcur.price > scur.vhigh:
                 scur.vhigh = tcur.price
@@ -633,7 +652,7 @@ XS15 = lambda x:x%15 == 0 and x>0
 XS30 = lambda x:x%30 == 0 and x>0
 XSDAY = lambda x:x == 270
 
-NullXMinute = BaseObject(sopen=[],sclose=[],shigh=[],slow=[],svol=[],iorder=[])
+NullXMinute = BaseObject(sopen=[],sclose=[],shigh=[],slow=[],svol=[],iorder=[],sholding=[])
 
 @indicator
 def XMINUTE(m1,sfunc,_ts=None):
@@ -652,6 +671,7 @@ def XMINUTE(m1,sfunc,_ts=None):
         _ts.shigh = []
         _ts.slow = []
         _ts.svol = []
+        _ts.sholding=[]
         _ts.iorder = []
         _ts.xmin = []       #开盘分钟
         _ts.cur = BaseObject(vopen = 0,
@@ -660,6 +680,7 @@ def XMINUTE(m1,sfunc,_ts=None):
                              vlow=99999999,
                              xmin =0,                             
                              svol=0,
+                             holding=0,
                              iorder=0,
                     )  
         _ts.ilast = 0
@@ -673,6 +694,7 @@ def XMINUTE(m1,sfunc,_ts=None):
             scur.xmin = m1.min1[i]
         scur.vclose = m1.sclose[i]
         scur.svol += m1.svol[i]
+        scur.holding = m1.sholding[i]
         if m1.shigh[i] > scur.vhigh:
             scur.vhigh = m1.shigh[i]
         if m1.slow[i] < scur.vlow:
@@ -684,6 +706,7 @@ def XMINUTE(m1,sfunc,_ts=None):
             _ts.shigh.append(scur.vhigh)
             _ts.slow.append(scur.vlow)
             _ts.svol.append(scur.svol)
+            _ts.sholding.append(scur.holding)
             _ts.iorder.append(scur.iorder)
             _ts.xmin.append(scur.xmin)
 
@@ -693,6 +716,7 @@ def XMINUTE(m1,sfunc,_ts=None):
             scur.vlow = 99999999
             scur.svol = 0
             scur.xmin = 0
+            scur.holding = 0
             scur.iorder += 1
             _ts.modified = True
 
@@ -704,5 +728,5 @@ MINUTE5 = fcustom(XMINUTE,sfunc=XS5)
 MINUTE10 = fcustom(XMINUTE,sfunc=XS10)   
 MINUTE15 = fcustom(XMINUTE,sfunc=XS15)   
 MINUTE30 = fcustom(XMINUTE,sfunc=XS30)   
-MINUTED = fcustom(XMINUTE,sfunc=XSDAY)   
+MINUTED = fcustom(XMINUTE,sfunc=XSDAY)
 
