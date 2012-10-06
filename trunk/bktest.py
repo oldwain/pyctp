@@ -1,5 +1,18 @@
 # -*- coding: utf-8 -*-
 
+'''
+基于ticks的回测机制
+使用方式:
+In [1]: import bktest
+
+In [2]: rtts = bktest.load_all(['IF1206','IF1207'])
+
+In [3]: ss = bktest.cruiser1(rtts,[bktest.l_ema_sm])    #请将l_ema_sm更换成实际策略
+
+In [4]: bktest.Trade.print_info(ss[0][1])
+
+'''
+
 import re
 import os.path
 import logging
@@ -43,7 +56,14 @@ class TickAgent(object):#ticks数据管理,只管理一个合约,并最多测试
             mystrategys = [mystrategys]
         self.trades = []
         #env = BaseObject(holdings=False,to_open=[],to_close=[],cur_inst=None,iorder=0) #holding是当前持仓，to_open/close是当前信号
-        env = BaseObject(cur_inst=None,iorder=0,days=BaseObject(sopen=[],sclose=[],shigh=[],slow=[])) #holding是当前持仓，to_open/close是当前信号
+        env = BaseObject(cur_inst=None,iorder=0,dmin1=BaseObject(sopen=[],   #min1结构需要遵从dac2.MINUTE的结构
+                                                                sclose=[],
+                                                                shigh=[],
+                                                                slow=[],
+                                                                svol=[],
+                                                                iorder=[],
+                                                                min1=[],
+                                                            )) 
         for ss in mystrategys:  #初始化
             ss.holdings = False
             ss.to_open = []
@@ -55,16 +75,13 @@ class TickAgent(object):#ticks数据管理,只管理一个合约,并最多测试
                 continue
             ##主循环
             self.run_day(env,mystrategys,dt)
-            env.days.sopen.append(env.cur_inst.cur_day.vopen)
-            env.days.sclose.append(env.cur_inst.cur_day.vclose)
-            env.days.shigh.append(env.cur_inst.cur_day.vhigh)
-            env.days.slow.append(env.cur_inst.cur_day.vlow)
         #return self.trades#,env
         return mystrategys
 
     def run_day(self,env,mystrategys,dticks):#
         '''
             日回测
+            todo: 适当时候整合到Agent2中去, 继承或组合Agent2的部分功能,避免重复. 有必要么?
         '''
         print 'run day:%s' % (dticks.tdate)
         tbegin = time.time()
@@ -72,17 +89,17 @@ class TickAgent(object):#ticks数据管理,只管理一个合约,并最多测试
             ss.opener.dreset()
         logging.info('run day:%s' % (dticks.tdate))
         popen = dticks.ticks[0].price
-        env.cur_inst = BaseObject(cur_day=BaseObject(vhigh=popen,vlow=popen,vopen=popen,vclose=popen),
-                                 days=env.days,   
+        env.cur_inst = BaseObject(cur_day=BaseObject(vhigh=popen,vlow=popen,vopen=popen,vclose=popen,iidhigh=0,iidlow=0),
+                                 dmin1 = env.dmin1,  #之前日期的min1
                                  ticks=[],
                                  prices=[],
                                  dvols=[],
                                  vols=[],
+                                 holdings=[],
                                  bids=[],
                                  asks=[],
                                  vbid=[],
                                  vask=[],
-                                 deltas=[],
                                  tick_base=2,
                               )
         dvol = 0
@@ -99,17 +116,19 @@ class TickAgent(object):#ticks数据管理,只管理一个合约,并最多测试
             env.cur_inst.ticks.append(ctick)
             env.cur_inst.prices.append(ctick.price)
             env.cur_inst.dvols.append(ctick.dvolume)
+            env.cur_inst.holdings.append(ctick.holding)
             env.cur_inst.vols.append(ctick.dvolume - pre_tick.dvolume if pre_tick else ctick.dvolume)
             env.cur_inst.bids.append(ctick.bid_price)
             env.cur_inst.asks.append(ctick.ask_price)
             env.cur_inst.vbid.append(ctick.bid_volume)
             env.cur_inst.vask.append(ctick.ask_volume)
-            env.cur_inst.deltas.append(ctick.ask_price-ctick.bid_price)
             dvol = ctick.dvolume
             if ctick.price > env.cur_inst.cur_day.vhigh:
                 env.cur_inst.cur_day.vhigh = ctick.price
+                env.cur_inst.cur_day.iidhigh = ctick.iorder
             if ctick.price < env.cur_inst.cur_day.vlow:
                 env.cur_inst.cur_day.vlow = ctick.price
+                env.cur_inst.cur_day.iidlow = ctick.iorder
             pre_tick = ctick
 
             #先平后开
@@ -399,6 +418,83 @@ class T_LONG_EC(T_LONG):
 ###########
 #  止损示例
 ###########
+class T_LONG_FIXED_STOPER(strategy.LONG_STOPER):
+    def __init__(self,data,bline,max_overflow=strategy.MAX_CLOSE_OVERFLOW,valid_length=strategy.STOP_VALID_LENGTH,opened=None,tick_base=2,base_lost=50,keeper=lambda x:80):
+        strategy.LONG_STOPER.__init__(self,data,bline)
+        self.max_overflow = max_overflow    #溢点用于计算目标价
+        self.valid_length = valid_length    #有效期用于计算撤单时间
+        self.name = u'多头固定离场'
+        self.opened = opened
+        self.keeper = keeper(opened.base_price)
+        self.base_stop = opened.base_stop if opened!=None else opened.base_price - base_lost*tick_base
+        #self.cur_stop = self.base_stop
+        self.set_base_line(self.base_stop)
+        print u'原始止损:',self.get_base_line()
+        self.tick_base = tick_base
+        self.is_keeped = False
+
+    def check(self,tick):
+        if tick.price - self.opened.base_price > self.keeper and not self.is_keeped:
+            self.set_base_line(self.opened.base_price)
+            print 'moving stoper to:',self.get_base_line(),tick.time
+            self.is_keeped = True
+        if tick.price < self.get_base_line() or tick.min1>1500:
+            return (True,tick.price,False)
+        return (False,0,False)
+
+
+class T_SHORT_FIXED_STOPER(strategy.SHORT_STOPER):
+    def __init__(self,data,bline,max_overflow=strategy.MAX_CLOSE_OVERFLOW,valid_length=strategy.STOP_VALID_LENGTH,opened=None,tick_base=2,base_lost=50,keeper=lambda x:80):
+        strategy.SHORT_STOPER.__init__(self,data,bline)
+        self.max_overflow = max_overflow    #溢点用于计算目标价
+        self.valid_length = valid_length    #有效期用于计算撤单时间
+        self.name = u'空头固定离场'
+        #self.keeper = keeper
+        self.keeper = keeper(opened.base_price)
+        self.opened = opened
+        self.base_stop = opened.base_stop if opened!=None else opened.base_price + base_lost*tick_base
+        #self.cur_stop = self.base_stop
+        self.set_base_line(self.base_stop)
+        self.tlow = opened.base_price
+        self.tick_base = tick_base
+        self.is_keeped = False
+
+    def check(self,tick):
+        if self.opened.base_price - tick.price > self.keeper and not self.is_keeped:
+            self.set_base_line(self.opened.base_price)
+            print 'moving stoper to:',self.get_base_line()
+            self.is_keeped = True
+        if tick.price > self.get_base_line() or tick.min1>1500:
+            print 'fixed stoper:',tick.time,tick.price
+            return (True,tick.price,False)
+        return (False,0,False)
+
+class T_SHORT_FIXED_STOPER2(strategy.SHORT_STOPER):
+    def __init__(self,data,bline,max_overflow=strategy.MAX_CLOSE_OVERFLOW,valid_length=strategy.STOP_VALID_LENGTH,opened=None,tick_base=2,base_lost=50,keeper=lambda x:80):
+        strategy.SHORT_STOPER.__init__(self,data,bline)
+        self.max_overflow = max_overflow    #溢点用于计算目标价
+        self.valid_length = valid_length    #有效期用于计算撤单时间
+        self.name = u'空头固定离场'
+        #self.keeper = keeper
+        self.keeper = keeper(opened.base_price)
+        self.opened = opened
+        self.base_stop = opened.base_stop if opened!=None else opened.base_price + base_lost*tick_base
+        #self.cur_stop = self.base_stop
+        self.set_base_line(self.base_stop)
+        self.tlow = opened.base_price
+        self.tick_base = tick_base
+        self.is_keeped = False
+
+    def check(self,tick):
+        if self.get_base_line() - tick.price > self.keeper and not self.is_keeped:
+            self.set_base_line(self.opened.base_price)
+            print 'moving stoper to:',self.get_base_line()
+            self.is_keeped = True
+        if tick.price > self.get_base_line() or tick.min1>1500:
+            print 'fixed stoper:',tick.time,tick.price
+            return (True,tick.price,False)
+        return (False,0,False)
+
 class T_LONG_MOVING_STOPER(strategy.LONG_STOPER):
     def __init__(self,data,bline,max_overflow=strategy.MAX_CLOSE_OVERFLOW,valid_length=strategy.STOP_VALID_LENGTH,opened=None,tick_base=2,base_lost=10,mtime=2):
         strategy.LONG_STOPER.__init__(self,data,bline)
@@ -460,9 +556,87 @@ class T_SHORT_MOVING_STOPER(strategy.SHORT_STOPER):
         #    #self.set_base_line(self.opened.price)
         #    stop_changed = True
         if tick.price <= self.tlow - self.tick_base * self.mtime:
-            self.set_base_line(self.get_base_line() + (self.tlow - tick.price)/self.mtime)
+            self.set_base_line(self.get_base_line() - (self.tlow - tick.price)/self.mtime)
             self.tlow = tick.price 
             stop_changed = True
+            print 'moving stop:',tick.time,self.get_base_line(),tick.price
+        return (False,0,stop_changed)
+
+class T_SHORT_MOVING_STOPER2(strategy.SHORT_STOPER):
+    def __init__(self,data,bline,max_overflow=strategy.MAX_CLOSE_OVERFLOW,valid_length=strategy.STOP_VALID_LENGTH,opened=None,tick_base=2,base_lost=10,m1=3,m2=2):
+        strategy.SHORT_STOPER.__init__(self,data,bline)
+        self.max_overflow = max_overflow    #溢点用于计算目标价
+        self.valid_length = valid_length    #有效期用于计算撤单时间
+        self.name = u'空头离场基类'
+        self.opened = opened
+        self.base_stop = opened.base_stop if opened!=None else opened.base_price + base_lost*tick_base
+        #self.cur_stop = self.base_stop
+        self.set_base_line(self.base_stop)
+        self.tlow = opened.base_price
+        self.tick_base = tick_base
+        self.m1 = m1    #m1/m2为移动的单位,每前进mtime,则将移动止损m2/m1
+        self.m2 = m2    #
+
+    def check(self,tick):
+        if tick.price > self.get_base_line() or tick.min1>1500:
+            return (True,tick.price,False)
+        #if self.opened.price - tick.price > 30:
+        #    return (True,tick.price,False)
+
+        stop_changed = False
+        #if self.opened.price - tick.price > 20:
+        #    self.set_base_line(self.get_base_line() if self.get_base_line()<self.opened.price else self.opened.price)
+        #    #self.set_base_line(self.opened.price)
+        #    stop_changed = True
+        if tick.price <= self.tlow - self.tick_base * self.m1/self.m2:
+            self.set_base_line(self.get_base_line() - (self.tlow - tick.price)*self.m2/self.m1)
+            self.tlow = tick.price 
+            stop_changed = True
+            #print tick.time,self.get_base_line()
+        return (False,0,stop_changed)
+
+
+
+from my.mydac import AVENERGY
+class T_SHORT_SPREAD_STOPER(strategy.SHORT_STOPER):
+    def __init__(self,data,bline,max_overflow=strategy.MAX_CLOSE_OVERFLOW,valid_length=strategy.STOP_VALID_LENGTH,opened=None,tick_base=2,base_lost=10,mtime=3):
+        strategy.SHORT_STOPER.__init__(self,data,bline)
+        self.max_overflow = max_overflow    #溢点用于计算目标价
+        self.valid_length = valid_length    #有效期用于计算撤单时间
+        self.name = u'空头离场基类'
+        self.opened = opened
+        self.base_stop = opened.base_stop
+        #self.cur_stop = self.base_stop
+        self.set_base_line(self.base_stop)
+        self.tlow = opened.base_price
+        self.tick_base = tick_base
+        venergy = AVENERGY(data.prices,data.dvols)
+        self.vmafr = NMA(SUB(venergy.shigh,venergy.slow))
+        self.mtime = mtime  #移动的单位,每前进mtime,则将止损移动1/mtime
+        self.max_spread = opened.base_price + self.vmafr[-1]*10
+        self.bline = bline
+        #print self.base_stop,self.max_spread,bline
+
+    def check(self,tick):
+        if tick.price > self.get_base_line() or tick.min1>1500:
+            print tick.time,tick.price,self.get_base_line()
+            return (True,tick.price,False)
+        #if self.opened.price - tick.price > 30:
+        #    return (True,tick.price,False)
+
+        stop_changed = False
+        #if self.opened.price - tick.price > 20:
+        #    self.set_base_line(self.get_base_line() if self.get_base_line()<self.opened.price else self.opened.price)
+        #    #self.set_base_line(self.opened.price)
+        #    stop_changed = True
+        #if self.tlow < self.max_spread and tick.price <= self.tlow - self.tick_base * self.mtime:
+        if self.get_base_line() < self.max_spread and tick.price <= self.tlow - self.tick_base * self.mtime:
+            #self.set_base_line(self.get_base_line() + (self.tlow - tick.price)/self.mtime/4)
+            self.set_base_line(self.base_stop + (self.bline - tick.price)/self.mtime/4)
+            #print tick.time,self.get_base_line(),tick.price,self.tlow
+            self.tlow = tick.price 
+            stop_changed = True
+            #print tick.time,self.get_base_line()
         return (False,0,stop_changed)
 
 

@@ -40,7 +40,9 @@ def add_log2console(level = logging.INFO):
     console.setFormatter(formatter)
     # add the handler to the root logger
     logging.getLogger('').addHandler(console)
-    
+ 
+def is_if(instrument):#判断是否是IF
+    return instrument[:2].upper() == 'IF'
 
 def date2week(iday):
     #http://blog.csdn.net/hawkfeifei/article/details/4337181
